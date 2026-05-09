@@ -1,6 +1,6 @@
 const CACHE_NAME = 'bettracker-v1';
 const ASSETS = [
-  './BetTracker.html',
+  './index.html',
   './manifest.json',
   'https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap'
 ];
@@ -38,9 +38,10 @@ self.addEventListener('fetch', e => {
       }).catch(() => {
         // Offline fallback for navigation requests
         if (e.request.mode === 'navigate') {
-          return caches.match('./BetTracker.html');
+          return caches.match('./index.html');
         }
       });
     })
   );
 });
+
