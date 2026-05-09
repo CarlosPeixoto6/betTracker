@@ -803,15 +803,33 @@ let _accessToken = null;
 
 const supa = {
   headers(token) {
-    const h = {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+(token||_accessToken||SUPA_KEY)};
-    return h;
+    return {
+      'Content-Type':'application/json',
+      'apikey':SUPA_KEY,
+      'Authorization':'Bearer '+(token||_accessToken||SUPA_KEY)
+    };
   },
   async post(path, body, token) {
-    const r = await fetch(SUPA_URL+path, {method:'POST',headers:this.headers(token),body:JSON.stringify(body)});
+    const r = await fetch(SUPA_URL+path, {
+      method:'POST',
+      headers:this.headers(token),
+      body:JSON.stringify(body),
+      mode:'cors',
+      credentials:'omit'
+    });
+    if(!r.ok && r.status !== 200 && r.status !== 201) {
+      const txt = await r.text();
+      throw new Error('HTTP '+r.status+': '+txt);
+    }
     return r.json();
   },
   async get(path, token) {
-    const r = await fetch(SUPA_URL+path, {method:'GET',headers:{...this.headers(token),'Prefer':'count=exact'}});
+    const r = await fetch(SUPA_URL+path, {
+      method:'GET',
+      headers:{...this.headers(token),'Prefer':'count=exact'},
+      mode:'cors',
+      credentials:'omit'
+    });
     const data = await r.json();
     const count = parseInt(r.headers.get('content-range')?.split('/')[1])||0;
     return {data, count};
@@ -850,27 +868,49 @@ async function doAuth() {
   btn.disabled = true;
   btn.textContent = authMode==='login' ? 'A entrar…' : 'A criar conta…';
   err.textContent = '';
-  
-  const endpoint = authMode==='login' ? '/auth/v1/token?grant_type=password' : '/auth/v1/signup';
-  const res = await supa.post(endpoint, {email, password:pass});
-  
-  btn.disabled = false;
-  btn.textContent = authMode==='login' ? 'Entrar' : 'Criar conta';
-  
-  if(res.error || res.error_description || res.msg) {
-    err.textContent = res.error_description || res.msg || res.error || 'Erro desconhecido';
-    return;
+
+  try {
+    const endpoint = authMode==='login' ? '/auth/v1/token?grant_type=password' : '/auth/v1/signup';
+    const res = await supa.post(endpoint, {email, password:pass});
+
+    btn.disabled = false;
+    btn.textContent = authMode==='login' ? 'Entrar' : 'Criar conta';
+
+    // Handle errors
+    if(res.error || res.error_description || res.code) {
+      err.style.color = 'var(--red)';
+      err.textContent = res.error_description || res.message || res.error || 'Erro desconhecido';
+      return;
+    }
+
+    if(authMode==='register') {
+      // Supabase returns user object even with email confirmation pending
+      err.style.color = 'var(--green)';
+      err.textContent = 'Conta criada! Verifica o teu email para confirmar e depois entra.';
+      // Switch to login tab
+      setTimeout(() => switchAuthTab('login'), 2000);
+      return;
+    }
+
+    // Login
+    if(!res.access_token) {
+      err.style.color = 'var(--red)';
+      err.textContent = 'Email ou password incorretos.';
+      return;
+    }
+    _accessToken = res.access_token;
+    currentUser = res.user;
+    localStorage.setItem('supa_token', _accessToken);
+    localStorage.setItem('supa_user', JSON.stringify(currentUser));
+    showApp();
+
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = authMode==='login' ? 'Entrar' : 'Criar conta';
+    err.style.color = 'var(--red)';
+    err.textContent = 'Erro de ligação. Verifica a tua internet.';
+    console.error('Auth error:', e);
   }
-  if(authMode==='register') {
-    err.style.color='var(--green)';
-    err.textContent='Conta criada! Verifica o teu email para confirmar.';
-    return;
-  }
-  _accessToken = res.access_token;
-  currentUser = res.user;
-  localStorage.setItem('supa_token', _accessToken);
-  localStorage.setItem('supa_user', JSON.stringify(currentUser));
-  showApp();
 }
 
 function showApp() {
