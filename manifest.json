@@ -1,8 +1,8 @@
-{
+
   "name": "BetTracker",
   "short_name": "BetTracker",
   "description": "Registo e análise de apostas desportivas",
-  "start_url": "./BetTracker.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0a0a0f",
