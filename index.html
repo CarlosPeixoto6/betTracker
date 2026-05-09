@@ -1023,8 +1023,59 @@ function eurS(v){return(v>=0?'+':'')+eur(v);}
 function bc(r){return{Win:'won',Lost:'lost',Ganhou:'won',Perdeu:'lost'}[r]||'lost';}
 
 window.addEventListener('DOMContentLoaded',()=>{
-  checkSession();
+  // Handle email confirmation token from URL
+  const hash = window.location.hash;
+  const params = new URLSearchParams(window.location.search);
+  
+  // Supabase sends token_hash and type in URL after email confirmation
+  const tokenHash = params.get('token_hash') || extractFromHash(hash, 'token_hash');
+  const type = params.get('type') || extractFromHash(hash, 'type');
+  const accessToken = extractFromHash(hash, 'access_token');
+  const refreshToken = extractFromHash(hash, 'refresh_token');
+
+  if(accessToken) {
+    // Direct token in hash (older Supabase format)
+    _accessToken = accessToken;
+    supa.get('/auth/v1/user', accessToken).then(res => {
+      if(res.data && res.data.id) {
+        currentUser = res.data;
+        localStorage.setItem('supa_token', accessToken);
+        localStorage.setItem('supa_user', JSON.stringify(currentUser));
+        // Clean URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        showApp();
+      } else {
+        checkSession();
+      }
+    }).catch(() => checkSession());
+  } else if(tokenHash && type) {
+    // New Supabase format - verify the token
+    supa.post('/auth/v1/verify', {token_hash: tokenHash, type: type}).then(res => {
+      if(res.access_token) {
+        _accessToken = res.access_token;
+        currentUser = res.user;
+        localStorage.setItem('supa_token', res.access_token);
+        localStorage.setItem('supa_user', JSON.stringify(res.user));
+        window.history.replaceState({}, document.title, window.location.pathname);
+        showApp();
+      } else {
+        checkSession();
+      }
+    }).catch(() => checkSession());
+  } else {
+    checkSession();
+  }
 });
+
+function extractFromHash(hash, key) {
+  if(!hash || !hash.includes(key)) return null;
+  const parts = hash.replace('#', '').split('&');
+  for(const part of parts) {
+    const [k, v] = part.split('=');
+    if(k === key) return decodeURIComponent(v);
+  }
+  return null;
+}
 
 async function init(){
   // Show loading state
