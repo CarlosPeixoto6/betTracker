@@ -882,9 +882,21 @@ async function doAuth() {
     btn.textContent = authMode==='login' ? 'Entrar' : 'Criar conta';
 
     // Handle errors
-    if(res.error || res.error_description || res.code) {
+    if(res.error || res.error_description || res.code || res.msg) {
       err.style.color = 'var(--red)';
-      err.textContent = res.error_description || res.message || res.error || 'Erro desconhecido';
+      const errCode = res.error_code || '';
+      const errMsg = res.msg || res.error_description || res.message || res.error || '';
+      if(errCode === 'over_email_send_rate_limit') {
+        err.textContent = 'Limite de emails atingido. Aguarda alguns minutos e tenta novamente.';
+      } else if(errCode === 'email_not_confirmed') {
+        err.textContent = 'Email não confirmado. Verifica a tua caixa de entrada.';
+      } else if(errCode === 'invalid_credentials') {
+        err.textContent = 'Email ou password incorretos.';
+      } else if(errCode === 'user_already_exists') {
+        err.textContent = 'Este email já está registado. Tenta entrar.';
+      } else {
+        err.textContent = errMsg || 'Erro desconhecido. Tenta novamente.';
+      }
       return;
     }
 
