@@ -464,8 +464,16 @@ select.fpill.active, button.fpill.active { background:var(--blue); color:#fff; }
 }
 .cal-confirm:active, .cal-cancel:active { opacity:.8; }
 
-.adv-btn { flex:0 !important; width:36px; padding:8px; display:flex; align-items:center; justify-content:center; color:var(--label3); overflow:visible !important; }
+.adv-btn { flex:0 !important; width:36px; padding:8px; display:flex; align-items:center; justify-content:center; color:var(--label3); overflow:visible !important; position:relative; }
 .adv-btn.active { background:rgba(0,122,255,0.15); color:var(--blue); }
+.adv-popover {
+  position:absolute; top:calc(100% + 8px); right:0;
+  background:var(--bg2); border-radius:16px;
+  box-shadow:0 8px 32px rgba(0,0,0,.25), 0 0 0 0.5px var(--sep);
+  padding:16px; width:280px; z-index:999;
+  display:none;
+}
+.adv-popover.open { display:block; }
 
 /* ── Auth Screen ─────────────────────────────── */
 #auth-screen {
@@ -664,9 +672,27 @@ select.fpill.active, button.fpill.active { background:var(--blue); color:#fff; }
           <option value="">Ano</option>
         </select>
         <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:0">
-          <button class="fpill adv-btn" id="adv-btn" onclick="openAdvFilters()">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
-          </button>
+          <div style="position:relative;flex:0">
+            <button class="fpill adv-btn" id="adv-btn" onclick="openAdvFilters(event)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+            </button>
+            <div class="adv-popover" id="adv-popover" onclick="event.stopPropagation()">
+              <div class="ig" style="margin:0 0 12px">
+                <div class="ir">
+                  <span class="il">De</span>
+                  <input type="date" class="if" id="adv-from" onchange="syncAdvDate('from')" style="text-align:right;width:auto;min-width:130px">
+                </div>
+                <div class="ir">
+                  <span class="il">Até</span>
+                  <input type="date" class="if" id="adv-to" onchange="syncAdvDate('to')" style="text-align:right;width:auto;min-width:130px">
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <button onclick="clearAdvFilters()" style="padding:11px;background:var(--fill);border:none;border-radius:10px;font-family:var(--font);font-size:14px;font-weight:600;color:var(--label2);cursor:pointer">Limpar</button>
+                <button onclick="applyAdvFilters()" style="padding:11px;background:var(--blue);border:none;border-radius:10px;font-family:var(--font);font-size:14px;font-weight:600;color:#fff;cursor:pointer">Aplicar</button>
+              </div>
+            </div>
+          </div>
           <span style="font-size:10px;color:var(--label3);pointer-events:none">📅</span>
         </div>
       </div>
@@ -1146,21 +1172,21 @@ function closeAdvFilters(){
   document.getElementById('adv-overlay').style.display='none';
 }
 function clearAdvFilters(){
+  closeAdvFilters();
   document.getElementById('h-from').value='';
   document.getElementById('h-to').value='';
   document.getElementById('adv-from').value='';
   document.getElementById('adv-to').value='';
   document.getElementById('adv-btn').classList.remove('active');
   renderHistory();
-  closeAdvFilters();
 }
 function applyAdvFilters(){
+  closeAdvFilters();
   document.getElementById('h-from').value=document.getElementById('adv-from').value||'';
   document.getElementById('h-to').value=document.getElementById('adv-to').value||'';
   const hasDate=document.getElementById('h-from').value||document.getElementById('h-to').value;
   document.getElementById('adv-btn').classList.toggle('active',!!hasDate);
   renderHistory();
-  closeAdvFilters();
 }
 function validateDateRange(field){
   const min=window._drMin||'';
@@ -1678,29 +1704,9 @@ function renderHeatmap(fl, ano){
   </div>
 </div>
 
-<input type="hidden" id="h-from"><input type="hidden" id="h-to">
-<div id="adv-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeAdvFilters()">
-  <div style="background:var(--bg2);border-radius:20px 20px 0 0;padding:20px 16px calc(var(--safe-bot)+20px);width:100%;max-width:600px" onclick="event.stopPropagation()">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-      <span style="font-size:17px;font-weight:700;letter-spacing:-0.4px">Filtros Avançados</span>
-      <button onclick="closeAdvFilters()" style="background:var(--fill);border:none;border-radius:50%;width:30px;height:30px;font-size:16px;color:var(--label2);cursor:pointer">✕</button>
-    </div>
-    <div class="ig">
-      <div class="ir">
-        <span class="il">De</span>
-        <input type="date" class="if" id="adv-from" onchange="syncAdvDate('from')" style="text-align:right;width:auto;min-width:130px">
-      </div>
-      <div class="ir">
-        <span class="il">Até</span>
-        <input type="date" class="if" id="adv-to" onchange="syncAdvDate('to')" style="text-align:right;width:auto;min-width:130px">
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px">
-      <button onclick="clearAdvFilters()" style="padding:14px;background:var(--fill);border:none;border-radius:12px;font-family:var(--font);font-size:15px;font-weight:600;color:var(--label2);cursor:pointer">Limpar</button>
-      <button onclick="applyAdvFilters()" style="padding:14px;background:var(--blue);border:none;border-radius:12px;font-family:var(--font);font-size:15px;font-weight:600;color:#fff;cursor:pointer">Aplicar</button>
-    </div>
-  </div>
-</div>
+<!-- Advanced filters popover (hidden inputs keep filter state) -->
+<input type="hidden" id="h-from">
+<input type="hidden" id="h-to">
 
 <script>
 // Service Worker only on HTTPS (not local files)
