@@ -653,8 +653,6 @@ select.fpill.active, button.fpill.active { background:var(--blue); color:#fff; }
       <div class="frow" style="padding-bottom:0">
         <select class="fpill" id="h-casa" onchange="renderHistory()">
           <option value="">Plataforma</option>
-          <option>22Bet</option><option>Betclic</option>
-          <option>Betano</option><option>Café Prestígio</option><option>Outra</option>
         </select>
       </div>
 
@@ -988,6 +986,84 @@ async function logout() {
 }
 
 // ── DB operations ─────────────────────────────
+// ── Plataformas ───────────────────────────────
+let plataformas = []; // [{id, nome}]
+
+async function loadPlataformas() {
+  const {data} = await supa.get(
+    `/rest/v1/plataformas?user_id=eq.${currentUser.id}&order=nome.asc`,
+    _accessToken
+  );
+  plataformas = Array.isArray(data) ? data : [];
+  // Seed default platforms if none exist
+  if(plataformas.length === 0) await seedPlataformas();
+  else buildPlataformaSelects();
+}
+
+async function seedPlataformas() {
+  const defaults = ['22Bet','Betclic','Betano','Café Prestígio'];
+  for(const nome of defaults) {
+    await supa.upsert('plataformas', {
+      user_id: currentUser.id, nome
+    }, _accessToken);
+  }
+  await loadPlataformas();
+}
+
+async function addPlataforma(nome) {
+  const {error} = await supa.upsert('plataformas', {
+    user_id: currentUser.id, nome
+  }, _accessToken);
+  if(error){ console.error('Add plataforma error:', error); return null; }
+  await loadPlataformas();
+  return plataformas.find(p => p.nome === nome);
+}
+
+function buildPlataformaSelects() {
+  const selects = ['f-casa', 'e-casa', 'h-casa'];
+  selects.forEach(id => {
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    const current = sel.value;
+    // Keep first option (placeholder or "Todas as casas")
+    while(sel.options.length > 1) sel.remove(1);
+    plataformas.forEach(p => sel.add(new Option(p.nome, p.nome)));
+    if(id === 'f-casa' || id === 'e-casa') sel.add(new Option('+ Nova plataforma', '__nova__'));
+    if(current) sel.value = current;
+  });
+}
+
+async function handlePlataformaChange(selId, newFieldId) {
+  const sel = document.getElementById(selId);
+  const newField = document.getElementById(newFieldId);
+  if(sel.value === '__nova__') {
+    sel.value = '';
+    newField.style.display = 'flex';
+    document.getElementById(newFieldId + '-input').focus();
+  } else {
+    newField.style.display = 'none';
+  }
+  if(selId === 'f-casa' || selId === 'e-casa') checkForm();
+}
+
+async function confirmNovaPlataforma(inputId, selId, newFieldId) {
+  const input = document.getElementById(inputId);
+  const nome = input.value.trim();
+  if(!nome) return;
+  // Check duplicate
+  if(plataformas.find(p => p.nome.toLowerCase() === nome.toLowerCase())) {
+    document.getElementById(selId).value = plataformas.find(p => p.nome.toLowerCase() === nome.toLowerCase()).nome;
+    document.getElementById(newFieldId).style.display = 'none';
+    input.value = '';
+    return;
+  }
+  await addPlataforma(nome);
+  document.getElementById(selId).value = nome;
+  document.getElementById(newFieldId).style.display = 'none';
+  input.value = '';
+  if(selId === 'f-casa' || selId === 'e-casa') checkForm();
+}
+
 async function loadFromDB() {
   const {data} = await supa.get(
     `/rest/v1/apostas?user_id=eq.${currentUser.id}&order=data.desc`,
@@ -1000,7 +1076,8 @@ async function saveToDB(bet) {
   const {error} = await supa.upsert('apostas', {
     id: bet.id, user_id: currentUser.id,
     data: bet.data, casa: bet.casa, resultado: bet.resultado,
-    gastos: bet.gastos, reembolso: bet.reembolso, lucro: bet.lucro, notas: bet.notas||''
+    gastos: bet.gastos, reembolso: bet.reembolso, lucro: bet.lucro, notas: bet.notas||'',
+    plataforma_id: bet.plataforma_id || null
   }, _accessToken);
   if(error) console.error('Save error:', error);
 }
@@ -1010,26 +1087,6 @@ async function deleteFromDB(id) {
   if(error) console.error('Delete error:', error);
 }
 
-async function migrateHistorical() {
-  // Check if user already has data
-  const {count} = await supa.get(
-    `/rest/v1/apostas?user_id=eq.${currentUser.id}&select=id`,
-    _accessToken
-  );
-  if(count > 0) return;
-  
-  const rows = HISTORICAL.map(b => ({
-    id: b.id, user_id: currentUser.id,
-    data: b.data, casa: b.casa, resultado: b.resultado,
-    gastos: b.gastos, reembolso: b.reembolso, lucro: b.lucro, notas: b.notas||''
-  }));
-  
-  for(let i=0; i<rows.length; i+=50) {
-    const {error} = await supa.upsert('apostas', rows.slice(i,i+50), _accessToken);
-    if(error) console.error('Migration error:', error);
-  }
-  console.log('Migration done:', rows.length, 'bets');
-}
 
 const MONTHS=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const COLORS={'22Bet':'#FF9500','Betclic':'#007AFF','Betano':'#FF3B30','Café Prestígio':'#34C759','Outra':'#5856D6'};
@@ -1045,13 +1102,1113 @@ function casaIcon(c){
   const primary=ICON_DIRECT[c]||('https://logo.clearbit.com/'+d);
   return '<div class="c-icon" style="background:transparent"><img src="'+primary+'" onerror="iconErr1(this,\''+d+'\')" style="width:36px;height:36px;border-radius:10px;object-fit:cover"></div>';
 }
-const KEY='bettracker-v2'; // kept for legacy
 const TABS={add:'Nova Aposta',history:'Histórico',analytics:'Análise'};
-const HISTORICAL=[{"id": 1000263, "data": "2026-05-03", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 62.42, "lucro": -10.0, "notas": ""}, {"id": 1000343, "data": "2026-05-03", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 140.63, "lucro": -5.0, "notas": ""}, {"id": 1000342, "data": "2026-05-02", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 155.38, "lucro": -5.0, "notas": ""}, {"id": 1000341, "data": "2026-05-01", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 108.77, "lucro": -10.0, "notas": ""}, {"id": 1000340, "data": "2026-04-27", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 122.08, "lucro": -10.0, "notas": ""}, {"id": 1000338, "data": "2026-04-26", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 80.89, "lucro": -5.0, "notas": ""}, {"id": 1000339, "data": "2026-04-26", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.0, "reembolso": 153.32, "lucro": -9.0, "notas": ""}, {"id": 1000337, "data": "2026-04-25", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 4.0, "reembolso": 137.0, "lucro": -4.0, "notas": ""}, {"id": 1000336, "data": "2026-04-23", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 14.71, "reembolso": 153.75, "lucro": -14.71, "notas": ""}, {"id": 1000262, "data": "2026-04-22", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 71.0, "lucro": -10.0, "notas": ""}, {"id": 1000335, "data": "2026-04-19", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 121.07, "lucro": -5.0, "notas": ""}, {"id": 1000334, "data": "2026-04-18", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Win", "gastos": 10.0, "reembolso": 114.71, "lucro": 104.71, "notas": ""}, {"id": 1000333, "data": "2026-04-15", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 111.1, "lucro": -10.0, "notas": ""}, {"id": 1000332, "data": "2026-04-14", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 90.26, "lucro": -5.0, "notas": ""}, {"id": 1000331, "data": "2026-04-13", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 166.4, "lucro": -10.0, "notas": ""}, {"id": 1000330, "data": "2026-04-12", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.0, "reembolso": 132.2, "lucro": -9.0, "notas": ""}, {"id": 1000328, "data": "2026-04-11", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 191.05, "lucro": -10.0, "notas": ""}, {"id": 1000329, "data": "2026-04-11", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.0, "reembolso": 127.04, "lucro": -9.0, "notas": ""}, {"id": 1000261, "data": "2026-04-10", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 113.2, "lucro": -10.0, "notas": ""}, {"id": 1000260, "data": "2026-04-09", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 25.59, "lucro": -10.0, "notas": ""}, {"id": 1000327, "data": "2026-04-08", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 263.23, "lucro": -10.0, "notas": ""}, {"id": 1000326, "data": "2026-04-05", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 118.46, "lucro": -10.0, "notas": ""}, {"id": 1000324, "data": "2026-04-04", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 122.04, "lucro": -10.0, "notas": ""}, {"id": 1000325, "data": "2026-04-04", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 200.47, "lucro": -5.0, "notas": ""}, {"id": 1000323, "data": "2026-04-03", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 98.51, "lucro": -10.0, "notas": ""}, {"id": 1000259, "data": "2026-03-31", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 33.07, "lucro": -10.0, "notas": ""}, {"id": 1000322, "data": "2026-03-31", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.0, "reembolso": 109.81, "lucro": -9.0, "notas": ""}, {"id": 1000320, "data": "2026-03-30", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 101.64, "lucro": -10.0, "notas": ""}, {"id": 1000321, "data": "2026-03-30", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 131.49, "lucro": -5.0, "notas": ""}, {"id": 1000319, "data": "2026-03-26", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 106.85, "lucro": -10.0, "notas": ""}, {"id": 1000318, "data": "2026-03-24", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 121.84, "lucro": -10.0, "notas": ""}, {"id": 1000317, "data": "2026-03-22", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 8.68, "reembolso": 91.07, "lucro": -8.68, "notas": ""}, {"id": 1000316, "data": "2026-03-21", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 69.92, "lucro": -10.0, "notas": ""}, {"id": 1000315, "data": "2026-03-20", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 106.83, "lucro": -10.0, "notas": ""}, {"id": 1000314, "data": "2026-03-18", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.0, "reembolso": 96.41, "lucro": -9.0, "notas": ""}, {"id": 1000313, "data": "2026-03-16", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 3.0, "reembolso": 180.1, "lucro": -3.0, "notas": ""}, {"id": 1000311, "data": "2026-03-15", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 123.37, "lucro": -10.0, "notas": ""}, {"id": 1000312, "data": "2026-03-15", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Win", "gastos": 10.0, "reembolso": 148.68, "lucro": 138.68, "notas": ""}, {"id": 1000310, "data": "2026-03-14", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 153.6, "lucro": -10.0, "notas": ""}, {"id": 1000258, "data": "2026-03-13", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 21.57, "lucro": -10.0, "notas": ""}, {"id": 1000309, "data": "2026-03-11", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 4.0, "reembolso": 114.39, "lucro": -4.0, "notas": ""}, {"id": 1000308, "data": "2026-03-10", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 4.0, "reembolso": 78.15, "lucro": -4.0, "notas": ""}, {"id": 1000257, "data": "2026-03-08", "casa": "22Bet", "resultado": "Lost", "gastos": 37.82, "reembolso": 134.71, "lucro": -37.82, "notas": ""}, {"id": 1000307, "data": "2026-03-08", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.0, "reembolso": 109.41, "lucro": -9.0, "notas": ""}, {"id": 1000256, "data": "2026-03-07", "casa": "22Bet", "resultado": "Win", "gastos": 10.0, "reembolso": 37.82, "lucro": 27.82, "notas": ""}, {"id": 1000306, "data": "2026-03-05", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 145.75, "lucro": -10.0, "notas": ""}, {"id": 1000305, "data": "2026-03-04", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 206.1, "lucro": -10.0, "notas": ""}, {"id": 1000255, "data": "2026-03-03", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 43.57, "lucro": -10.0, "notas": ""}, {"id": 1000304, "data": "2026-03-02", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 106.44, "lucro": -5.0, "notas": ""}, {"id": 1000303, "data": "2026-03-01", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 98.22, "lucro": -10.0, "notas": ""}, {"id": 1000253, "data": "2026-02-27", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 63.5, "lucro": -10.0, "notas": ""}, {"id": 1000254, "data": "2026-02-27", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 37.8, "lucro": -10.0, "notas": ""}, {"id": 1000302, "data": "2026-02-27", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 8.0, "reembolso": 95.85, "lucro": -8.0, "notas": ""}, {"id": 1000301, "data": "2026-02-26", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 8.0, "reembolso": 123.16, "lucro": -8.0, "notas": ""}, {"id": 1000300, "data": "2026-02-25", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 147.23, "lucro": -10.0, "notas": ""}, {"id": 1000299, "data": "2026-02-23", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 99.17, "lucro": -10.0, "notas": ""}, {"id": 1000298, "data": "2026-02-22", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 107.18, "lucro": -10.0, "notas": ""}, {"id": 1000296, "data": "2026-02-21", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.0, "reembolso": 138.8, "lucro": -9.0, "notas": ""}, {"id": 1000297, "data": "2026-02-21", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 7.0, "reembolso": 110.34, "lucro": -7.0, "notas": ""}, {"id": 1000295, "data": "2026-02-18", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 3.0, "reembolso": 152.17, "lucro": -3.0, "notas": ""}, {"id": 1000294, "data": "2026-02-17", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 122.98, "lucro": -10.0, "notas": ""}, {"id": 1000293, "data": "2026-02-16", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 7.05, "reembolso": 82.86, "lucro": -7.05, "notas": ""}, {"id": 1000292, "data": "2026-02-14", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Win", "gastos": 10.0, "reembolso": 87.05, "lucro": 77.05, "notas": ""}, {"id": 1000251, "data": "2026-02-13", "casa": "22Bet", "resultado": "Win", "gastos": 10.0, "reembolso": 31.77, "lucro": 21.77, "notas": ""}, {"id": 1000252, "data": "2026-02-13", "casa": "22Bet", "resultado": "Lost", "gastos": 31.77, "reembolso": 159.92, "lucro": -31.77, "notas": ""}, {"id": 1000291, "data": "2026-02-12", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 7.41, "reembolso": 92.32, "lucro": -7.41, "notas": ""}, {"id": 1000290, "data": "2026-02-10", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 107.23, "lucro": -10.0, "notas": ""}, {"id": 1000250, "data": "2026-02-08", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 19.35, "lucro": -10.0, "notas": ""}, {"id": 1000289, "data": "2026-02-08", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Win", "gastos": 10.0, "reembolso": 108.41, "lucro": 98.41, "notas": ""}, {"id": 1000288, "data": "2026-02-06", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 102.66, "lucro": -10.0, "notas": ""}, {"id": 1000249, "data": "2026-02-04", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 37.58, "lucro": -10.0, "notas": ""}, {"id": 1000287, "data": "2026-02-02", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 113.96, "lucro": -10.0, "notas": ""}, {"id": 1000247, "data": "2026-02-01", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 27.5, "lucro": -10.0, "notas": ""}, {"id": 1000248, "data": "2026-02-01", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 20.85, "lucro": -10.0, "notas": ""}, {"id": 1000286, "data": "2026-02-01", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 87.3, "lucro": -10.0, "notas": ""}, {"id": 1000284, "data": "2026-01-28", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.0, "reembolso": 112.95, "lucro": -9.0, "notas": ""}, {"id": 1000285, "data": "2026-01-28", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 113.24, "lucro": -10.0, "notas": ""}, {"id": 1000283, "data": "2026-01-26", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 3.47, "reembolso": 95.23, "lucro": -3.47, "notas": ""}, {"id": 1000281, "data": "2026-01-25", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Win", "gastos": 5.0, "reembolso": 74.47, "lucro": 69.47, "notas": ""}, {"id": 1000282, "data": "2026-01-25", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 131.35, "lucro": -10.0, "notas": ""}, {"id": 1000246, "data": "2026-01-23", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 52.5, "lucro": -10.0, "notas": ""}, {"id": 1000280, "data": "2026-01-23", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.11, "reembolso": 73.77, "lucro": -5.11, "notas": ""}, {"id": 1000278, "data": "2026-01-21", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 101.08, "lucro": -10.0, "notas": ""}, {"id": 1000279, "data": "2026-01-21", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 116.05, "lucro": -10.0, "notas": ""}, {"id": 1000277, "data": "2026-01-19", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 121.72, "lucro": -10.0, "notas": ""}, {"id": 1000275, "data": "2026-01-18", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 56.4, "lucro": -5.0, "notas": ""}, {"id": 1000276, "data": "2026-01-18", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 107.56, "lucro": -10.0, "notas": ""}, {"id": 1000274, "data": "2026-01-17", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Win", "gastos": 10.0, "reembolso": 129.11, "lucro": 119.11, "notas": ""}, {"id": 1000245, "data": "2026-01-11", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 40.0, "lucro": -10.0, "notas": ""}, {"id": 1000272, "data": "2026-01-11", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 3.0, "reembolso": 91.97, "lucro": -3.0, "notas": ""}, {"id": 1000273, "data": "2026-01-11", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.11, "reembolso": 119.36, "lucro": -10.11, "notas": ""}, {"id": 1000271, "data": "2026-01-09", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Win", "gastos": 10.0, "reembolso": 80.11, "lucro": 70.11, "notas": ""}, {"id": 1000244, "data": "2026-01-07", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 26.2, "lucro": -10.0, "notas": ""}, {"id": 1000270, "data": "2026-01-07", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 127.47, "lucro": -10.0, "notas": ""}, {"id": 1000269, "data": "2026-01-05", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 4.0, "reembolso": 129.28, "lucro": -4.0, "notas": ""}, {"id": 1000243, "data": "2026-01-03", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 33.02, "lucro": -10.0, "notas": ""}, {"id": 1000267, "data": "2026-01-03", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 80.39, "lucro": -10.0, "notas": ""}, {"id": 1000268, "data": "2026-01-03", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 118.93, "lucro": -10.0, "notas": ""}, {"id": 1000265, "data": "2026-01-02", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 102.54, "lucro": -10.0, "notas": ""}, {"id": 1000266, "data": "2026-01-02", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 100.46, "lucro": -10.0, "notas": ""}, {"id": 1000264, "data": "2026-01-01", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 83.31, "lucro": -10.0, "notas": ""}, {"id": 1000242, "data": "2025-12-31", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 8.0, "reembolso": 134.83, "lucro": -8.0, "notas": ""}, {"id": 1000241, "data": "2025-12-30", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 118.85, "lucro": -10.0, "notas": ""}, {"id": 1000073, "data": "2025-12-28", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 30.05, "lucro": -10.0, "notas": ""}, {"id": 1000239, "data": "2025-12-28", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 197.0, "lucro": -10.0, "notas": ""}, {"id": 1000240, "data": "2025-12-28", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 123.16, "lucro": -10.0, "notas": ""}, {"id": 1000238, "data": "2025-12-27", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 125.0, "lucro": -10.0, "notas": ""}, {"id": 1000237, "data": "2025-12-26", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 187.32, "lucro": -10.0, "notas": ""}, {"id": 1000236, "data": "2025-12-25", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 2.0, "reembolso": 181.04, "lucro": -2.0, "notas": ""}, {"id": 1000235, "data": "2025-12-24", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 2.0, "reembolso": 133.67, "lucro": -2.0, "notas": ""}, {"id": 1000233, "data": "2025-12-23", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 4.0, "reembolso": 85.92, "lucro": -4.0, "notas": ""}, {"id": 1000234, "data": "2025-12-23", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 3.57, "reembolso": 152.68, "lucro": -3.57, "notas": ""}, {"id": 1000232, "data": "2025-12-22", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Win", "gastos": 10.0, "reembolso": 148.34, "lucro": 138.34, "notas": ""}, {"id": 1000230, "data": "2025-12-21", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Win", "gastos": 10.0, "reembolso": 62.51, "lucro": 52.51, "notas": ""}, {"id": 1000231, "data": "2025-12-21", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 2.5, "reembolso": 104.46, "lucro": -2.5, "notas": ""}, {"id": 1000229, "data": "2025-12-20", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Win", "gastos": 10.0, "reembolso": 83.57, "lucro": 73.57, "notas": ""}, {"id": 1000227, "data": "2025-12-19", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.2, "reembolso": 116.55, "lucro": -9.2, "notas": ""}, {"id": 1000228, "data": "2025-12-19", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 128.11, "lucro": -10.0, "notas": ""}, {"id": 1000072, "data": "2025-12-18", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 27.5, "lucro": -10.0, "notas": ""}, {"id": 1000226, "data": "2025-12-18", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 147.48, "lucro": -10.0, "notas": ""}, {"id": 1000225, "data": "2025-12-15", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Win", "gastos": 16.15, "reembolso": 129.21, "lucro": 113.06, "notas": ""}, {"id": 1000071, "data": "2025-12-14", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 52.2, "lucro": -10.0, "notas": ""}, {"id": 1000223, "data": "2025-12-14", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 137.99, "lucro": -10.0, "notas": ""}, {"id": 1000224, "data": "2025-12-14", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.34, "reembolso": 114.32, "lucro": -10.34, "notas": ""}, {"id": 1000222, "data": "2025-12-13", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 128.92, "lucro": -5.0, "notas": ""}, {"id": 1000221, "data": "2025-12-11", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Win", "gastos": 5.0, "reembolso": 146.15, "lucro": 141.15, "notas": ""}, {"id": 1000070, "data": "2025-12-07", "casa": "22Bet", "resultado": "Lost", "gastos": 33.69, "reembolso": 104.67, "lucro": -33.69, "notas": ""}, {"id": 1000219, "data": "2025-12-07", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 175.49, "lucro": -10.0, "notas": ""}, {"id": 1000220, "data": "2025-12-07", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Win", "gastos": 10.0, "reembolso": 103.34, "lucro": 93.34, "notas": ""}, {"id": 1000069, "data": "2025-12-06", "casa": "22Bet", "resultado": "Win", "gastos": 10.0, "reembolso": 33.69, "lucro": 23.69, "notas": ""}, {"id": 1000217, "data": "2025-12-06", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 117.14, "lucro": -10.0, "notas": ""}, {"id": 1000218, "data": "2025-12-06", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 3.0, "reembolso": 108.56, "lucro": -3.0, "notas": ""}, {"id": 1000068, "data": "2025-12-05", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 26.8, "lucro": -10.0, "notas": ""}, {"id": 1000216, "data": "2025-12-05", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 111.69, "lucro": -10.0, "notas": ""}, {"id": 1000215, "data": "2025-12-04", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 83.03, "lucro": -10.0, "notas": ""}, {"id": 1000067, "data": "2025-12-02", "casa": "22Bet", "resultado": "Lost", "gastos": 14.1, "reembolso": 29.61, "lucro": -14.1, "notas": ""}, {"id": 1000066, "data": "2025-12-01", "casa": "22Bet", "resultado": "Win", "gastos": 10.0, "reembolso": 14.1, "lucro": 4.1, "notas": ""}, {"id": 1000065, "data": "2025-11-30", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 257.99, "lucro": -10.0, "notas": ""}, {"id": 1000213, "data": "2025-11-30", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 52.24, "lucro": -5.0, "notas": ""}, {"id": 1000214, "data": "2025-11-30", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 6.77, "reembolso": 102.15, "lucro": -6.77, "notas": ""}, {"id": 1000212, "data": "2025-11-29", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.0, "reembolso": 101.44, "lucro": -9.0, "notas": ""}, {"id": 1000210, "data": "2025-11-28", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 106.77, "lucro": -10.0, "notas": ""}, {"id": 1000211, "data": "2025-11-28", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 3.0, "reembolso": 91.4, "lucro": -3.0, "notas": ""}, {"id": 1000209, "data": "2025-11-26", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Win", "gastos": 10.0, "reembolso": 116.77, "lucro": 106.77, "notas": ""}, {"id": 1000208, "data": "2025-11-25", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.0, "reembolso": 127.34, "lucro": -9.0, "notas": ""}, {"id": 1000206, "data": "2025-11-22", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 122.73, "lucro": -10.0, "notas": ""}, {"id": 1000207, "data": "2025-11-22", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 104.1, "lucro": -10.0, "notas": ""}, {"id": 1000205, "data": "2025-11-19", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 106.16, "lucro": -10.0, "notas": ""}, {"id": 1000204, "data": "2025-11-16", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 137.0, "lucro": -10.0, "notas": ""}, {"id": 1000203, "data": "2025-11-15", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 127.37, "lucro": -10.0, "notas": ""}, {"id": 1000202, "data": "2025-11-12", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 108.8, "lucro": -10.0, "notas": ""}, {"id": 1000063, "data": "2025-11-09", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 27.65, "lucro": -10.0, "notas": ""}, {"id": 1000064, "data": "2025-11-09", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 32.32, "lucro": -10.0, "notas": ""}, {"id": 1000201, "data": "2025-11-07", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 149.64, "lucro": -10.0, "notas": ""}, {"id": 1000062, "data": "2025-11-06", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 23.28, "lucro": -10.0, "notas": ""}, {"id": 1000200, "data": "2025-11-04", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 145.08, "lucro": -10.0, "notas": ""}, {"id": 1000199, "data": "2025-11-03", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 94.65, "lucro": -5.0, "notas": ""}, {"id": 1000060, "data": "2025-11-02", "casa": "22Bet", "resultado": "Lost", "gastos": 3.66, "reembolso": 10.27, "lucro": -3.66, "notas": ""}, {"id": 1000061, "data": "2025-11-02", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 52.2, "lucro": -10.0, "notas": ""}, {"id": 1000198, "data": "2025-11-02", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 14.3, "reembolso": 156.44, "lucro": -14.3, "notas": ""}, {"id": 1000059, "data": "2025-11-01", "casa": "22Bet", "resultado": "Win", "gastos": 26.74, "reembolso": 103.66, "lucro": 76.92, "notas": ""}, {"id": 1000196, "data": "2025-11-01", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.0, "reembolso": 104.34, "lucro": -9.0, "notas": ""}, {"id": 1000197, "data": "2025-11-01", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Win", "gastos": 10.0, "reembolso": 104.3, "lucro": 94.3, "notas": ""}, {"id": 1000058, "data": "2025-10-31", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 26.74, "lucro": -10.0, "notas": ""}, {"id": 1000195, "data": "2025-10-29", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 96.64, "lucro": -10.0, "notas": ""}, {"id": 1000194, "data": "2025-10-28", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 109.23, "lucro": -10.0, "notas": ""}, {"id": 1000193, "data": "2025-10-27", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 126.25, "lucro": -10.0, "notas": ""}, {"id": 1000057, "data": "2025-10-26", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 43.23, "lucro": -10.0, "notas": ""}, {"id": 1000191, "data": "2025-10-26", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 125.06, "lucro": -10.0, "notas": ""}, {"id": 1000192, "data": "2025-10-26", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 162.24, "lucro": -10.0, "notas": ""}, {"id": 1000056, "data": "2025-10-25", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 95.4, "lucro": -10.0, "notas": ""}, {"id": 1000190, "data": "2025-10-25", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 107.8, "lucro": -10.0, "notas": ""}, {"id": 1000055, "data": "2025-10-24", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 22.9, "lucro": -10.0, "notas": ""}, {"id": 1000189, "data": "2025-10-24", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 150.1, "lucro": -10.0, "notas": ""}, {"id": 1000188, "data": "2025-10-22", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 132.83, "lucro": -5.0, "notas": ""}, {"id": 1000187, "data": "2025-10-20", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 180.5, "lucro": -5.0, "notas": ""}, {"id": 1000054, "data": "2025-10-19", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 66.11, "lucro": -10.0, "notas": ""}, {"id": 1000185, "data": "2025-10-19", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 141.58, "lucro": -10.0, "notas": ""}, {"id": 1000186, "data": "2025-10-19", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 100.08, "lucro": -10.0, "notas": ""}, {"id": 1000052, "data": "2025-10-18", "casa": "22Bet", "resultado": "Win", "gastos": 10.0, "reembolso": 22.25, "lucro": 12.25, "notas": ""}, {"id": 1000053, "data": "2025-10-18", "casa": "22Bet", "resultado": "Lost", "gastos": 22.25, "reembolso": 103.29, "lucro": -22.25, "notas": ""}, {"id": 1000184, "data": "2025-10-18", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 94.12, "lucro": -10.0, "notas": ""}, {"id": 1000183, "data": "2025-10-15", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 101.07, "lucro": -5.0, "notas": ""}, {"id": 1000182, "data": "2025-10-14", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.0, "reembolso": 95.85, "lucro": -9.0, "notas": ""}, {"id": 1000181, "data": "2025-10-12", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 89.68, "lucro": -10.0, "notas": ""}, {"id": 1000180, "data": "2025-10-10", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 173.74, "lucro": -5.0, "notas": ""}, {"id": 1000179, "data": "2025-10-07", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 79.63, "lucro": -10.0, "notas": ""}, {"id": 1000050, "data": "2025-10-05", "casa": "22Bet", "resultado": "Win", "gastos": 10.0, "reembolso": 60.0, "lucro": 50.0, "notas": ""}, {"id": 1000051, "data": "2025-10-05", "casa": "22Bet", "resultado": "Win", "gastos": 60.0, "reembolso": 139.6, "lucro": 79.6, "notas": ""}, {"id": 1000178, "data": "2025-10-05", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 84.4, "lucro": -10.0, "notas": ""}, {"id": 1000177, "data": "2025-10-04", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 73.31, "lucro": -5.0, "notas": ""}, {"id": 1000176, "data": "2025-10-03", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 99.28, "lucro": -10.0, "notas": ""}, {"id": 1000174, "data": "2025-10-01", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.0, "reembolso": 103.92, "lucro": -9.0, "notas": ""}, {"id": 1000175, "data": "2025-10-01", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 120.38, "lucro": -10.0, "notas": ""}, {"id": 1000173, "data": "2025-09-30", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 4.0, "reembolso": 71.94, "lucro": -4.0, "notas": ""}, {"id": 1000172, "data": "2025-09-29", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 118.81, "lucro": -10.0, "notas": ""}, {"id": 1000170, "data": "2025-09-28", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 121.86, "lucro": -10.0, "notas": ""}, {"id": 1000171, "data": "2025-09-28", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 74.11, "lucro": -10.0, "notas": ""}, {"id": 1000168, "data": "2025-09-27", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 8.58, "reembolso": 78.54, "lucro": -8.58, "notas": ""}, {"id": 1000169, "data": "2025-09-27", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 88.08, "lucro": -10.0, "notas": ""}, {"id": 1000049, "data": "2025-09-26", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 88.82, "lucro": -10.0, "notas": ""}, {"id": 1000047, "data": "2025-09-25", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 20.7, "lucro": -10.0, "notas": ""}, {"id": 1000048, "data": "2025-09-25", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 23.44, "lucro": -10.0, "notas": ""}, {"id": 1000167, "data": "2025-09-22", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 108.77, "lucro": -10.0, "notas": ""}, {"id": 1000166, "data": "2025-09-21", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Win", "gastos": 10.0, "reembolso": 108.58, "lucro": 98.58, "notas": ""}, {"id": 1000164, "data": "2025-09-20", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 78.71, "lucro": -10.0, "notas": ""}, {"id": 1000165, "data": "2025-09-20", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 82.33, "lucro": -5.0, "notas": ""}, {"id": 1000046, "data": "2025-09-19", "casa": "22Bet", "resultado": "Lost", "gastos": 26.2, "reembolso": 109.87, "lucro": -26.2, "notas": ""}, {"id": 1000045, "data": "2025-09-18", "casa": "22Bet", "resultado": "Win", "gastos": 10.0, "reembolso": 26.2, "lucro": 16.2, "notas": ""}, {"id": 1000163, "data": "2025-09-17", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.0, "reembolso": 125.94, "lucro": -9.0, "notas": ""}, {"id": 1000044, "data": "2025-09-16", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 85.49, "lucro": -10.0, "notas": ""}, {"id": 1000162, "data": "2025-09-16", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.0, "reembolso": 107.53, "lucro": -9.0, "notas": ""}, {"id": 1000160, "data": "2025-09-14", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 140.84, "lucro": -10.0, "notas": ""}, {"id": 1000161, "data": "2025-09-14", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.0, "reembolso": 113.84, "lucro": -9.0, "notas": ""}, {"id": 1000043, "data": "2025-09-13", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 88.01, "lucro": -10.0, "notas": ""}, {"id": 1000158, "data": "2025-09-13", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Win", "gastos": 10.0, "reembolso": 90.12, "lucro": 80.12, "notas": ""}, {"id": 1000159, "data": "2025-09-13", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 99.2, "lucro": -10.0, "notas": ""}, {"id": 1000042, "data": "2025-09-12", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 52.5, "lucro": -10.0, "notas": ""}, {"id": 1000157, "data": "2025-09-10", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 87.01, "lucro": -5.0, "notas": ""}, {"id": 1000156, "data": "2025-09-09", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 91.49, "lucro": -10.0, "notas": ""}, {"id": 1000155, "data": "2025-09-08", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.0, "reembolso": 186.82, "lucro": -9.0, "notas": ""}, {"id": 1000154, "data": "2025-09-07", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 83.31, "lucro": -5.0, "notas": ""}, {"id": 1000152, "data": "2025-09-06", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 151.63, "lucro": -10.0, "notas": ""}, {"id": 1000153, "data": "2025-09-06", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 149.96, "lucro": -5.0, "notas": ""}, {"id": 1000151, "data": "2025-09-04", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 93.23, "lucro": -5.0, "notas": ""}, {"id": 1000150, "data": "2025-09-01", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 132.03, "lucro": -10.0, "notas": ""}, {"id": 1000040, "data": "2025-08-31", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 60.45, "lucro": -10.0, "notas": ""}, {"id": 1000041, "data": "2025-08-31", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 47.07, "lucro": -10.0, "notas": ""}, {"id": 1000038, "data": "2025-08-30", "casa": "22Bet", "resultado": "Win", "gastos": 10.0, "reembolso": 23.44, "lucro": 13.44, "notas": ""}, {"id": 1000039, "data": "2025-08-30", "casa": "22Bet", "resultado": "Lost", "gastos": 23.44, "reembolso": 63.9, "lucro": -23.44, "notas": ""}, {"id": 1000037, "data": "2025-08-29", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 88.62, "lucro": -10.0, "notas": ""}, {"id": 1000035, "data": "2025-08-28", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 34.75, "lucro": -10.0, "notas": ""}, {"id": 1000036, "data": "2025-08-28", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 41.2, "lucro": -10.0, "notas": ""}, {"id": 1000033, "data": "2025-08-27", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 20.46, "lucro": -10.0, "notas": ""}, {"id": 1000034, "data": "2025-08-27", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 32.93, "lucro": -10.0, "notas": ""}, {"id": 1000032, "data": "2025-08-26", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 36.01, "lucro": -10.0, "notas": ""}, {"id": 1000031, "data": "2025-08-25", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 88.3, "lucro": -10.0, "notas": ""}, {"id": 1000029, "data": "2025-08-24", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 35.65, "lucro": -10.0, "notas": ""}, {"id": 1000030, "data": "2025-08-24", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 51.37, "lucro": -10.0, "notas": ""}, {"id": 1000027, "data": "2025-08-23", "casa": "22Bet", "resultado": "Win", "gastos": 10.0, "reembolso": 18.77, "lucro": 8.77, "notas": ""}, {"id": 1000028, "data": "2025-08-23", "casa": "22Bet", "resultado": "Lost", "gastos": 18.77, "reembolso": 42.78, "lucro": -18.77, "notas": ""}, {"id": 1000026, "data": "2025-08-22", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 76.46, "lucro": -10.0, "notas": ""}, {"id": 1000025, "data": "2025-08-21", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 20.75, "lucro": -10.0, "notas": ""}, {"id": 1000024, "data": "2025-08-20", "casa": "22Bet", "resultado": "Lost", "gastos": 2.23, "reembolso": 17.16, "lucro": -2.23, "notas": ""}, {"id": 1000023, "data": "2025-08-19", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 46.8, "lucro": -10.0, "notas": ""}, {"id": 1000022, "data": "2025-08-17", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 26.0, "lucro": -10.0, "notas": ""}, {"id": 1000148, "data": "2025-08-17", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 123.24, "lucro": -10.0, "notas": ""}, {"id": 1000149, "data": "2025-08-17", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 8.0, "reembolso": 110.74, "lucro": -8.0, "notas": ""}, {"id": 1000146, "data": "2025-08-16", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 97.53, "lucro": -10.0, "notas": ""}, {"id": 1000147, "data": "2025-08-16", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 8.0, "reembolso": 132.39, "lucro": -8.0, "notas": ""}, {"id": 1000145, "data": "2025-08-14", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 76.38, "lucro": -10.0, "notas": ""}, {"id": 1000144, "data": "2025-08-13", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 113.11, "lucro": -10.0, "notas": ""}, {"id": 1000021, "data": "2025-08-12", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 20.32, "lucro": -10.0, "notas": ""}, {"id": 1000020, "data": "2025-08-11", "casa": "22Bet", "resultado": "Win", "gastos": 18.02, "reembolso": 142.23, "lucro": 124.21, "notas": ""}, {"id": 1000143, "data": "2025-08-11", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 129.75, "lucro": -10.0, "notas": ""}, {"id": 1000019, "data": "2025-08-10", "casa": "22Bet", "resultado": "Win", "gastos": 74.42, "reembolso": 168.02, "lucro": 93.6, "notas": ""}, {"id": 1000141, "data": "2025-08-10", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 77.05, "lucro": -10.0, "notas": ""}, {"id": 1000142, "data": "2025-08-10", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 165.59, "lucro": -10.0, "notas": ""}, {"id": 1000018, "data": "2025-08-08", "casa": "22Bet", "resultado": "Win", "gastos": 40.11, "reembolso": 74.42, "lucro": 34.31, "notas": ""}, {"id": 1000140, "data": "2025-08-08", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.0, "reembolso": 102.0, "lucro": -9.0, "notas": ""}, {"id": 1000139, "data": "2025-08-07", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 101.55, "lucro": -10.0, "notas": ""}, {"id": 1000016, "data": "2025-08-06", "casa": "22Bet", "resultado": "Win", "gastos": 10.0, "reembolso": 21.35, "lucro": 11.35, "notas": ""}, {"id": 1000017, "data": "2025-08-06", "casa": "22Bet", "resultado": "Win", "gastos": 21.35, "reembolso": 40.11, "lucro": 18.76, "notas": ""}, {"id": 1000138, "data": "2025-08-05", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 119.05, "lucro": -10.0, "notas": ""}, {"id": 1000137, "data": "2025-08-04", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 102.73, "lucro": -10.0, "notas": ""}, {"id": 1000013, "data": "2025-08-03", "casa": "22Bet", "resultado": "Win", "gastos": 10.0, "reembolso": 17.0, "lucro": 7.0, "notas": ""}, {"id": 1000014, "data": "2025-08-03", "casa": "22Bet", "resultado": "Win", "gastos": 17.0, "reembolso": 38.44, "lucro": 21.44, "notas": ""}, {"id": 1000015, "data": "2025-08-03", "casa": "22Bet", "resultado": "Lost", "gastos": 38.44, "reembolso": 65.35, "lucro": -38.44, "notas": ""}, {"id": 1000135, "data": "2025-08-03", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 140.24, "lucro": -10.0, "notas": ""}, {"id": 1000136, "data": "2025-08-03", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 105.36, "lucro": -5.0, "notas": ""}, {"id": 1000134, "data": "2025-07-29", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 110.66, "lucro": -10.0, "notas": ""}, {"id": 1000012, "data": "2025-07-27", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 94.32, "lucro": -10.0, "notas": ""}, {"id": 1000133, "data": "2025-07-27", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 75.44, "lucro": -5.0, "notas": ""}, {"id": 1000132, "data": "2025-07-26", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 103.11, "lucro": -10.0, "notas": ""}, {"id": 1000130, "data": "2025-07-24", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.0, "reembolso": 106.06, "lucro": -9.0, "notas": ""}, {"id": 1000131, "data": "2025-07-24", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 8.0, "reembolso": 83.2, "lucro": -8.0, "notas": ""}, {"id": 1000129, "data": "2025-07-23", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 133.21, "lucro": -10.0, "notas": ""}, {"id": 1000128, "data": "2025-07-21", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 4.0, "reembolso": 90.66, "lucro": -4.0, "notas": ""}, {"id": 1000127, "data": "2025-07-20", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 4.0, "reembolso": 125.99, "lucro": -4.0, "notas": ""}, {"id": 1000126, "data": "2025-07-19", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 70.66, "lucro": -5.0, "notas": ""}, {"id": 1000125, "data": "2025-07-16", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 84.21, "lucro": -5.0, "notas": ""}, {"id": 1000124, "data": "2025-07-14", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 3.0, "reembolso": 78.79, "lucro": -3.0, "notas": ""}, {"id": 1000011, "data": "2025-07-13", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 18.45, "lucro": -10.0, "notas": ""}, {"id": 1000123, "data": "2025-07-13", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 269.89, "lucro": -5.0, "notas": ""}, {"id": 1000121, "data": "2025-07-12", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 99.56, "lucro": -5.0, "notas": ""}, {"id": 1000122, "data": "2025-07-12", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 123.24, "lucro": -5.0, "notas": ""}, {"id": 1000120, "data": "2025-07-10", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 102.94, "lucro": -10.0, "notas": ""}, {"id": 1000010, "data": "2025-07-07", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 23.92, "lucro": -10.0, "notas": ""}, {"id": 1000119, "data": "2025-07-06", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 87.12, "lucro": -5.0, "notas": ""}, {"id": 1000118, "data": "2025-07-05", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 70.61, "lucro": -10.0, "notas": ""}, {"id": 1000009, "data": "2025-07-04", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 126.78, "lucro": -10.0, "notas": ""}, {"id": 1000117, "data": "2025-06-30", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 84.45, "lucro": -10.0, "notas": ""}, {"id": 1000116, "data": "2025-06-29", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 89.64, "lucro": -5.0, "notas": ""}, {"id": 1000007, "data": "2025-06-28", "casa": "22Bet", "resultado": "Win", "gastos": 10.0, "reembolso": 38.1, "lucro": 28.1, "notas": ""}, {"id": 1000008, "data": "2025-06-28", "casa": "22Bet", "resultado": "Lost", "gastos": 38.1, "reembolso": 113.08, "lucro": -38.1, "notas": ""}, {"id": 1000115, "data": "2025-06-26", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 4.0, "reembolso": 151.78, "lucro": -4.0, "notas": ""}, {"id": 1000114, "data": "2025-06-25", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 111.14, "lucro": -10.0, "notas": ""}, {"id": 1000006, "data": "2025-06-24", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 21.5, "lucro": -10.0, "notas": ""}, {"id": 1000113, "data": "2025-06-23", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 15.0, "reembolso": 137.69, "lucro": -15.0, "notas": ""}, {"id": 1000111, "data": "2025-06-22", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 99.99, "lucro": -5.0, "notas": ""}, {"id": 1000112, "data": "2025-06-22", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 3.0, "reembolso": 95.99, "lucro": -3.0, "notas": ""}, {"id": 1000110, "data": "2025-06-21", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 126.35, "lucro": -10.0, "notas": ""}, {"id": 1000109, "data": "2025-06-19", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 179.81, "lucro": -10.0, "notas": ""}, {"id": 1000005, "data": "2025-06-18", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 26.98, "lucro": -10.0, "notas": ""}, {"id": 1000107, "data": "2025-06-17", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 89.45, "lucro": -5.0, "notas": ""}, {"id": 1000108, "data": "2025-06-17", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 69.73, "lucro": -5.0, "notas": ""}, {"id": 1000004, "data": "2025-06-15", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 22.64, "lucro": -10.0, "notas": ""}, {"id": 1000106, "data": "2025-06-15", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 154.32, "lucro": -5.0, "notas": ""}, {"id": 1000105, "data": "2025-06-14", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 114.11, "lucro": -10.0, "notas": ""}, {"id": 1000104, "data": "2025-06-12", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 127.76, "lucro": -10.0, "notas": ""}, {"id": 1000003, "data": "2025-06-11", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 16.16, "lucro": -10.0, "notas": ""}, {"id": 1000103, "data": "2025-06-10", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 102.45, "lucro": -5.0, "notas": ""}, {"id": 1000102, "data": "2025-06-09", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 43.17, "lucro": -5.0, "notas": ""}, {"id": 1000101, "data": "2025-06-08", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 81.0, "lucro": -10.0, "notas": ""}, {"id": 1000100, "data": "2025-06-04", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 148.11, "lucro": -10.0, "notas": ""}, {"id": 1000099, "data": "2025-06-01", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 70.73, "lucro": -10.0, "notas": ""}, {"id": 1000098, "data": "2025-05-26", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 7.17, "reembolso": 122.81, "lucro": -7.17, "notas": ""}, {"id": 1000002, "data": "2025-05-25", "casa": "22Bet", "resultado": "Lost", "gastos": 10.0, "reembolso": 52.33, "lucro": -10.0, "notas": ""}, {"id": 1000096, "data": "2025-05-25", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 82.93, "lucro": -10.0, "notas": ""}, {"id": 1000097, "data": "2025-05-25", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 125.1, "lucro": -10.0, "notas": ""}, {"id": 1000095, "data": "2025-05-19", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Win", "gastos": 9.0, "reembolso": 87.17, "lucro": 78.17, "notas": ""}, {"id": 1000092, "data": "2025-05-17", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 116.95, "lucro": -10.0, "notas": ""}, {"id": 1000093, "data": "2025-05-17", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 122.92, "lucro": -10.0, "notas": ""}, {"id": 1000094, "data": "2025-05-17", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.0, "reembolso": 85.96, "lucro": -9.0, "notas": ""}, {"id": 1000091, "data": "2025-05-16", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 130.85, "lucro": -10.0, "notas": ""}, {"id": 1000090, "data": "2025-05-12", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 94.68, "lucro": -10.0, "notas": ""}, {"id": 1000088, "data": "2025-05-11", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 138.43, "lucro": -10.0, "notas": ""}, {"id": 1000089, "data": "2025-05-11", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 103.55, "lucro": -10.0, "notas": ""}, {"id": 1000086, "data": "2025-05-10", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 103.77, "lucro": -10.0, "notas": ""}, {"id": 1000087, "data": "2025-05-10", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 151.66, "lucro": -10.0, "notas": ""}, {"id": 1000085, "data": "2025-05-07", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 87.85, "lucro": -10.0, "notas": ""}, {"id": 1000084, "data": "2025-05-05", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 104.52, "lucro": -10.0, "notas": ""}, {"id": 1000083, "data": "2025-05-04", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 152.9, "lucro": -10.0, "notas": ""}, {"id": 1000080, "data": "2025-05-01", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 107.12, "lucro": -10.0, "notas": ""}, {"id": 1000081, "data": "2025-05-01", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 9.0, "reembolso": 122.32, "lucro": -9.0, "notas": ""}, {"id": 1000082, "data": "2025-05-01", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 92.77, "lucro": -10.0, "notas": ""}, {"id": 1000079, "data": "2025-04-29", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 5.0, "reembolso": 111.64, "lucro": -5.0, "notas": ""}, {"id": 1000001, "data": "2025-04-28", "casa": "22Bet", "resultado": "Lost", "gastos": 45.29, "reembolso": 249.99, "lucro": -45.29, "notas": ""}, {"id": 1000000, "data": "2025-04-27", "casa": "22Bet", "resultado": "Win", "gastos": 10.0, "reembolso": 45.29, "lucro": 35.29, "notas": ""}, {"id": 1000077, "data": "2025-04-27", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 95.53, "lucro": -10.0, "notas": ""}, {"id": 1000078, "data": "2025-04-27", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 137.22, "lucro": -10.0, "notas": ""}, {"id": 1000076, "data": "2025-04-26", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 106.21, "lucro": -10.0, "notas": ""}, {"id": 1000074, "data": "2025-04-25", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 141.82, "lucro": -10.0, "notas": ""}, {"id": 1000075, "data": "2025-04-25", "casa": "Caf\u00e9 Prest\u00edgio", "resultado": "Lost", "gastos": 10.0, "reembolso": 93.5, "lucro": -10.0, "notas": ""}]
-let bets=[],selResult='',pendingId=null;
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BetTracker">
+<meta name="theme-color" content="#0a0a0f">
+<title>BetTracker</title>
+<style>
+:root {
+  --bg:        #F2F2F7;
+  --bg2:       #FFFFFF;
+  --fill:      rgba(118,118,128,0.12);
+  --sep:       rgba(60,60,67,0.12);
+  --label:     #000000;
+  --label2:    rgba(60,60,67,0.6);
+  --label3:    rgba(60,60,67,0.3);
+  --blue:      #007AFF;
+  --green:     #34C759;
+  --red:       #FF3B30;
+  --orange:    #FF9500;
+  --indigo:    #5856D6;
+  --safe-top:  env(safe-area-inset-top, 44px);
+  --safe-bot:  env(safe-area-inset-bottom, 34px);
+  --font:      -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+}
+* { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+html,body { height:100%; background:var(--bg); color:var(--label); font-family:var(--font);
+  overflow:hidden; -webkit-font-smoothing:antialiased; }
+#app { display:flex; flex-direction:column; height:100dvh; }
 
-function load(){} // replaced by loadFromDB
-function save(){} // replaced by saveToDB
+/* Navbar */
+
+
+/* Content */
+.content { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+.page { display:none; }
+.page.active { display:block; animation:fadeUp .26s cubic-bezier(.32,1,.62,1) both; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+
+/* Tab bar */
+.tabbar {
+  background:rgba(249,249,249,0.94);
+  backdrop-filter:saturate(180%) blur(20px);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);
+  border-top:0.5px solid var(--sep);
+  padding-bottom:var(--safe-bot);
+  display:flex; flex-shrink:0;
+}
+.tab-btn {
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+  padding:8px 0; background:none; border:none; color:var(--label3);
+  font-family:var(--font); font-size:10px; font-weight:500;
+  letter-spacing:0.02em; cursor:pointer; transition:color .15s;
+}
+.tab-btn.active { color:var(--blue); }
+.tab-ic {
+  width:28px; height:28px; border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .15s, transform .1s;
+}
+.tab-btn.active .tab-ic { background:rgba(0,122,255,0.1); }
+.tab-btn:active .tab-ic { transform:scale(0.86); }
+.tab-btn svg { width:22px; height:22px; }
+
+/* Large title */
+.ltitle-wrap { padding:calc(var(--safe-top) + 16px) 20px 8px; }
+.ltitle { font-size:34px; font-weight:700; letter-spacing:0.37px; }
+
+/* Section header */
+.sec-hdr {
+  font-size:13px; font-weight:600; letter-spacing:0.06em;
+  text-transform:uppercase; color:var(--label2);
+  padding:16px 20px 6px;
+}
+
+/* Input group */
+.ig { background:var(--bg2); border-radius:13px; margin:0 16px 4px; overflow:hidden; }
+.ir { display:flex; align-items:center; padding:0 16px; gap:10px; position:relative; }
+.ir+.ir::before { content:''; position:absolute; top:0; left:16px; right:0;
+  height:0.5px; background:var(--sep); }
+.il { font-size:14px; letter-spacing:-0.4px; color:var(--label);
+  min-width:95px; flex-shrink:0; padding:13px 0; }
+.if {
+  flex:1; border:none; outline:none; background:transparent;
+  font-family:var(--font); font-size:14px; letter-spacing:-0.4px;
+  color:var(--label); text-align:right; padding:13px 0; min-width:0;
+}
+.if::placeholder { color:var(--label3); }
+.if.num { font-variant-numeric:tabular-nums; }
+.if.pos { color:var(--green); }
+.if.neg { color:var(--red); }
+select.if { appearance:none; -webkit-appearance:none; cursor:pointer; }
+select.if.placeholder { color:var(--label3); font-size:13px; }
+
+/* Segmented */
+.seg-wrap { margin:0 16px 4px; display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.seg {
+  background:var(--fill); border:none; border-radius:13px; padding:16px 8px;
+  font-family:var(--font); font-size:16px; font-weight:700;
+  color:var(--label2); cursor:pointer; transition:all .2s; letter-spacing:-0.3px;
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+}
+.seg .seg-icon { font-size:26px; line-height:1; }
+.seg.won  { background:rgba(52,199,89,0.15); color:var(--green); }
+.seg.lost { background:rgba(255,59,48,0.15); color:var(--red); }
+.seg:active { opacity:.75; transform:scale(.97); }
+
+/* Primary button */
+.btn-primary {
+  display:block; width:calc(100% - 32px); margin:12px 16px 4px;
+  padding:16px; background:var(--blue); color:#fff; border:none;
+  border-radius:13px; font-family:var(--font); font-size:14px;
+  font-weight:600; letter-spacing:-0.4px; cursor:pointer; transition:all .15s;
+}
+.btn-primary:active { transform:scale(0.98); opacity:.85; }
+.btn-primary.ok { background:var(--green); }
+.btn-primary:disabled { background:var(--fill); color:var(--label3); cursor:not-allowed; transform:none; }
+
+/* Summary card */
+.sum-card {
+  margin:8px 16px 4px; background:var(--blue); border-radius:16px;
+  padding:16px 20px; display:grid; grid-template-columns:1fr 1fr 1fr;
+  position:relative; overflow:hidden;
+}
+.sum-card::before { content:''; position:absolute; top:-30px; right:-30px;
+  width:100px; height:100px; background:rgba(255,255,255,.08); border-radius:50%; }
+.sum-card::after  { content:''; position:absolute; bottom:-20px; right:30px;
+  width:60px; height:60px; background:rgba(255,255,255,.06); border-radius:50%; }
+.si { position:relative; z-index:1; }
+.si-l { font-size:11px; font-weight:600; letter-spacing:0.04em;
+  text-transform:uppercase; color:rgba(255,255,255,.7); margin-bottom:4px; }
+.si-v { font-size:14px; font-weight:700; color:#fff;
+  letter-spacing:-0.5px; font-variant-numeric:tabular-nums; }
+
+/* Stat grid */
+.stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:0 16px 4px; }
+.sc { background:var(--bg2); border-radius:13px; padding:14px 16px; }
+.sc-l { font-size:12px; font-weight:600; letter-spacing:0.04em;
+  text-transform:uppercase; color:var(--label2); margin-bottom:5px; }
+.sc-v { font-size:22px; font-weight:700; letter-spacing:-0.5px;
+  font-variant-numeric:tabular-nums; }
+.sc-s { font-size:12px; color:var(--label3); margin-top:2px; }
+
+/* Filter row */
+.frow { display:flex; gap:8px; padding:8px 16px 4px; }
+.fpill {
+  background:var(--bg2); border:none; border-radius:20px;
+  padding:7px 10px; font-family:var(--font); font-size:14px;
+  font-weight:500; color:var(--label2); cursor:pointer;
+  appearance:none; -webkit-appearance:none;
+  letter-spacing:-0.2px; transition:all .15s;
+  flex:1; min-width:0; text-align:center; text-align-last:center; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap;
+}
+.fpill:active { opacity:.7; }
+select.fpill.active, button.fpill.active { background:var(--blue); color:#fff; }
+
+/* Bet item */
+.blist { margin:4px 16px; }
+.bi {
+  background:var(--bg2); border-radius:13px; margin-bottom:8px;
+  display:flex; align-items:center; gap:10px; padding:12px 14px;
+  transition:background .1s;
+}
+.bi:active { background:var(--fill); }
+.bdot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.bdot.won  { background:var(--green); }
+.bdot.lost { background:var(--red); }
+.bdot.reimb{ background:var(--orange); }
+.bdot.void { background:var(--label3); }
+.bbody { flex:1; min-width:0; }
+.btop { display:flex; align-items:center; gap:6px; margin-bottom:2px; }
+.bcasa { font-size:14px; font-weight:600; letter-spacing:-0.4px; }
+.bbadge { font-size:11px; font-weight:600; letter-spacing:0.02em;
+  padding:2px 7px; border-radius:20px; }
+.bbadge.won  { background:rgba(52,199,89,.12); color:var(--green); }
+.bbadge.lost { background:rgba(255,59,48,.12);  color:var(--red); }
+.bbadge.reimb{ background:rgba(255,149,0,.12);  color:var(--orange); }
+.bbadge.void { background:var(--fill);           color:var(--label2); }
+.bmeta { font-size:13px; color:var(--label2); white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; }
+.bright { text-align:right; flex-shrink:0; }
+.blucro { font-size:14px; font-weight:600; letter-spacing:-0.4px;
+  font-variant-numeric:tabular-nums; }
+.blucro.pos { color:var(--green); }
+.blucro.neg { color:var(--red); }
+.bgastos { font-size:12px; color:var(--label3); margin-top:1px;
+  font-variant-numeric:tabular-nums; }
+.bedit { background:none; border:none; padding:8px; font-size:14px;
+  border-radius:8px; cursor:pointer; transition:all .15s; }
+.bedit:active { background:rgba(255,255,255,.08); transform:scale(.9); }
+.bdel { background:none; border:none; color:var(--label3); padding:8px;
+  cursor:pointer; border-radius:8px; flex-shrink:0; transition:all .15s; }
+.bdel:active { color:var(--red); background:rgba(255,59,48,.1); }
+
+/* Card group (analytics) */
+.cg { background:var(--bg2); border-radius:13px; margin:0 16px 4px; overflow:hidden; }
+.cr { display:flex; align-items:center; gap:12px; padding:13px 16px; position:relative; }
+.cr+.cr::before { content:''; position:absolute; top:0; left:16px; right:0;
+  height:0.5px; background:var(--sep); }
+.c-icon { width:36px; height:36px; border-radius:10px; display:flex;
+  align-items:center; justify-content:center; font-size:20px;
+  font-weight:700; flex-shrink:0; color:#fff; overflow:hidden; background:#1c1c1e; }
+.c-icon img { width:36px; height:36px; object-fit:cover; border-radius:10px; }
+.c-meta { flex:1; min-width:0; }
+.c-name { font-size:14px; font-weight:600; letter-spacing:-0.4px; }
+.c-sub  { font-size:13px; color:var(--label2); margin-top:1px; }
+.c-val  { font-size:14px; font-weight:600; letter-spacing:-0.4px;
+  font-variant-numeric:tabular-nums; }
+.c-val.pos { color:var(--green); }
+.c-val.neg { color:var(--red); }
+
+/* Bar chart */
+.brow { display:flex; align-items:center; gap:10px; padding:8px 16px; }
+.blbl { font-size:12px; color:var(--label2); width:52px; flex-shrink:0; text-align:right; }
+.btrk { flex:1; height:6px; background:var(--fill); border-radius:3px; overflow:hidden; }
+.bfil { height:100%; border-radius:3px; transition:width .5s ease; }
+.bval { font-size:12px; font-weight:600; width:66px; text-align:right;
+  flex-shrink:0; font-variant-numeric:tabular-nums; letter-spacing:-0.3px; }
+
+/* Empty */
+.empty { display:flex; flex-direction:column; align-items:center;
+  padding:50px 20px; text-align:center; gap:6px; }
+.empty-icon { font-size:44px; }
+.empty-t { font-size:20px; font-weight:600; letter-spacing:-0.5px; }
+.empty-s { font-size:15px; color:var(--label2); }
+
+/* Action sheet overlay */
+.ov { position:fixed; inset:0; background:rgba(0,0,0,.4);
+  backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  display:flex; align-items:flex-end; z-index:100;
+  padding:8px 8px calc(var(--safe-bot) + 8px);
+  opacity:0; transition:opacity .22s; pointer-events:none; }
+.ov.show { opacity:1; pointer-events:all; }
+.as { width:100%; transform:translateY(16px);
+  transition:transform .24s cubic-bezier(.32,1.2,.62,1); }
+.ov.show .as { transform:none; }
+.as-main { background:rgba(255,255,255,.94);
+  backdrop-filter:blur(30px); -webkit-backdrop-filter:blur(30px);
+  border-radius:14px; overflow:hidden; margin-bottom:8px; }
+.as-title { padding:14px 16px 10px; text-align:center;
+  border-bottom:0.5px solid var(--sep); }
+.as-title h3 { font-size:14px; font-weight:600; }
+.as-title p  { font-size:13px; color:var(--label2); margin-top:2px; }
+.as-btn { width:100%; padding:17px; border:none; background:transparent;
+  font-family:var(--font); font-size:20px; font-weight:400;
+  letter-spacing:-0.4px; cursor:pointer; transition:background .1s; }
+.as-btn:active { background:var(--fill); }
+.as-btn.red { color:var(--red); }
+.as-cancel { width:100%; padding:17px; border:none; border-radius:14px;
+  background:rgba(255,255,255,.94); backdrop-filter:blur(30px);
+  -webkit-backdrop-filter:blur(30px); font-family:var(--font);
+  font-size:20px; font-weight:600; letter-spacing:-0.4px;
+  color:var(--blue); cursor:pointer; transition:background .1s; }
+.as-cancel:active { background:var(--fill); }
+
+.pb { height:28px; }
+
+/* ── Responsive Layout ───────────────────────────── */
+/* Centered container for larger screens */
+.content-inner {
+  max-width: 680px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+@media (min-width: 600px) {
+  /* Tab bar becomes a sidebar on desktop */
+  #app { flex-direction:row; }
+  .tabbar {
+    flex-direction:column; width:220px; flex-shrink:0;
+    border-top:none; border-right:0.5px solid var(--sep);
+    padding-bottom:0; padding-top:16px;
+    height:100dvh; position:sticky; top:0;
+  }
+  .tab-btn {
+    flex:none; flex-direction:row; gap:12px;
+    padding:12px 20px; font-size:14px; justify-content:flex-start;
+    border-radius:12px; margin:2px 8px;
+  }
+  .tab-ic { width:32px; height:32px; border-radius:9px; }
+  .tab-btn svg { width:20px; height:20px; }
+  .content { order:2; flex:1; min-width:0; height:100dvh; overflow-y:auto; }
+
+  /* Constrain all page content to max-width */
+  .page { max-width:720px; margin:0 auto; padding:24px; }
+
+  /* Reset element margins to rely on page padding */
+  .ltitle { font-size:28px; }
+  .ltitle-wrap { padding:4px 0 10px; }
+  .sec-hdr { padding:16px 0 6px; }
+  .ig { margin:0 0 6px; }
+  .seg-wrap { margin:0 0 6px; }
+  .stat-grid { margin:0 0 6px; grid-template-columns:repeat(4,1fr); }
+  .cg { margin:0 0 6px; }
+  .blist { padding:0; }
+  .btn-primary { width:100%; margin-left:0; margin-right:0; }
+  .frow { padding:8px 0 4px; }
+  .sum-card { margin:0 0 8px; }
+  .month-chart { margin:0 0 6px; }
+  .ir { padding:0 16px; }
+  .date-range-row { padding:4px 0 8px; }
+  .hm-monthly-wrap { margin:0 0 6px; }
+}
+
+@media (min-width: 1024px) {
+  .tabbar { width:260px; }
+  .page { max-width:860px; }
+}
+
+/* ── Heatmap ─────────────────────────────────────── */
+.heatmap-wrap {
+  overflow-x:auto; -webkit-overflow-scrolling:touch;
+  padding:0 16px 4px;
+  margin:0 16px 6px; overflow-x:auto; -webkit-overflow-scrolling:touch;
+}
+.heatmap-inner { display:flex; gap:3px; min-width:max-content; padding:4px 0 8px; }
+.hm-col { display:flex; flex-direction:column; gap:3px; }
+.hm-month-labels { display:flex; gap:3px; min-width:max-content; padding:0 0 2px; margin:0 16px; }
+.hm-month-lbl { font-size:10px; color:var(--label3); font-weight:500; }
+.hm-day-labels { display:flex; flex-direction:column; gap:3px; margin-right:4px; padding-top:0; }
+.hm-day-lbl { font-size:9px; color:var(--label3); height:12px; line-height:12px; width:18px; text-align:right; }
+.hm-row { display:flex; gap:3px; align-items:flex-start; }
+.hm-cell {
+  width:12px; height:12px; border-radius:3px; flex-shrink:0;
+  cursor:pointer; transition:opacity .1s;
+}
+.hm-cell:active { opacity:.7; }
+.hm-legend { display:flex; align-items:center; gap:6px; margin:6px 16px 0; justify-content:flex-end; }
+.hm-legend-lbl { font-size:10px; color:var(--label3); }
+.hm-legend-cell { width:10px; height:10px; border-radius:2px; }
+.hm-tooltip {
+  position:fixed; background:rgba(30,30,40,0.95); color:#fff;
+  padding:6px 10px; border-radius:8px; font-size:12px; font-weight:500;
+  pointer-events:none; z-index:999; white-space:nowrap;
+  transform:translate(-50%,-120%); transition:opacity .1s;
+  box-shadow:0 4px 12px rgba(0,0,0,.3);
+}
+
+@media (min-width:600px) {
+  .heatmap-wrap { margin:0 24px 6px; }
+  .hm-month-labels { margin:0 24px; }
+  .hm-legend { margin:6px 24px 0; }
+  .hm-cell { width:14px; height:14px; }
+  .hm-col { gap:3px; }
+  .heatmap-inner { gap:3px; }
+}
+
+/* Monthly heatmap */
+.hm-monthly-wrap {
+  display:grid; grid-template-columns:repeat(6,1fr);
+  gap:6px; margin:0 16px 4px; padding:4px 0;
+}
+.hm-month-cell {
+  aspect-ratio:1; border-radius:10px; display:flex;
+  flex-direction:column; align-items:center; justify-content:center;
+  gap:2px; cursor:default; transition:opacity .15s;
+}
+.hm-month-cell:active { opacity:.7; }
+.hm-month-cell .hmc-lbl { font-size:11px; font-weight:600; color:rgba(255,255,255,.6); }
+.hm-month-cell .hmc-val { font-size:10px; font-weight:700; color:#fff; font-family:'Space Mono',monospace; }
+@media(min-width:600px){
+  .hm-monthly-wrap { grid-template-columns:repeat(6,1fr); margin:0 24px 6px; gap:8px; }
+  .hm-month-cell .hmc-lbl { font-size:13px; }
+  .hm-month-cell .hmc-val { font-size:11px; }
+}
+
+/* Date range filter */
+.date-range-row {
+  background:var(--fill); border-radius:13px;
+  margin:0 16px 4px; overflow:hidden;
+}
+.dr-field {
+  display:flex; align-items:center;
+  padding:0 16px; position:relative;
+}
+.dr-field+.dr-field::before {
+  content:''; position:absolute; top:0; left:16px; right:0;
+  height:0.5px; background:var(--sep);
+}
+.dr-lbl {
+  font-size:17px; letter-spacing:-0.4px; color:var(--label);
+  min-width:95px; flex-shrink:0; padding:13px 0;
+}
+.dr-input {
+  flex:0; width:auto; margin-left:auto;
+  border:none; background:transparent; outline:none;
+  font-family:var(--font); font-size:17px; letter-spacing:-0.4px;
+  color:var(--label); text-align:right; padding:13px 0;
+}
+.dr-sep { display:none; }
+.dr-clear {
+  display:flex; align-items:center; justify-content:center;
+  width:100%; padding:11px 16px; background:none; border:none;
+  border-top:0.5px solid var(--sep);
+  font-family:var(--font); font-size:14px; font-weight:600;
+  color:var(--blue); cursor:pointer;
+}
+.dr-clear:active { opacity:.6; }
+@media(min-width:600px){
+  .date-range-row { padding:4px 24px 8px; }
+}
+
+/* ── Custom Date Picker ── */
+.dr-display { font-size:14px; color:var(--label); font-weight:500; }
+.cal-overlay {
+  position:fixed; inset:0; z-index:9999;
+  background:rgba(0,0,0,0.6); backdrop-filter:blur(4px);
+  display:flex; align-items:center; justify-content:center;
+  padding:16px;
+}
+.cal-sheet {
+  background:var(--bg2); border-radius:20px;
+  width:100%; max-width:340px; padding:20px 16px 16px;
+  box-shadow:0 8px 60px rgba(0,0,0,.4);
+}
+.cal-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.cal-nav-btn {
+  background:var(--fill); border:none; border-radius:8px;
+  width:34px; height:34px; font-size:20px; color:var(--label);
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+}
+.cal-nav-btn:active { opacity:.6; }
+.cal-title-btn {
+  font-size:15px; font-weight:700; color:var(--label); letter-spacing:-0.3px;
+  background:var(--fill); border:none; border-radius:8px;
+  padding:6px 12px; cursor:pointer; font-family:var(--font);
+}
+.cal-title-btn:active { opacity:.7; }
+.ym-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+.ym-sel {
+  background:var(--fill); border:none; border-radius:10px;
+  padding:8px 10px; font-family:var(--font); font-size:14px;
+  font-weight:600; color:var(--label); cursor:pointer;
+  appearance:none; -webkit-appearance:none; text-align:center;
+}
+.cal-dow { display:grid; grid-template-columns:repeat(7,1fr); margin-bottom:4px; }
+.cal-dow span { text-align:center; font-size:10px; font-weight:600; color:var(--label3); padding:4px 0; }
+.cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:1px; margin-bottom:12px; }
+.cal-day {
+  width:100%; height:36px; border-radius:50%; border:none; background:none;
+  font-family:var(--font); font-size:13px; font-weight:500; color:var(--label);
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+}
+.cal-day:active { opacity:.7; }
+.cal-day.disabled { color:var(--label3); opacity:.28; cursor:not-allowed; pointer-events:none; }
+.cal-day.empty { pointer-events:none; background:none; }
+.cal-day.selected { background:var(--blue); color:#fff; font-weight:700; border-radius:50%; }
+.cal-day.in-range { background:rgba(0,122,255,0.12); border-radius:0; }
+.cal-day.range-start { background:var(--blue); color:#fff; border-radius:50% 0 0 50%; }
+.cal-day.range-end { background:var(--blue); color:#fff; border-radius:0 50% 50% 0; }
+.cal-day.today { font-weight:700; color:var(--blue); }
+.cal-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:4px; }
+.cal-cancel {
+  padding:12px; background:var(--fill); border:none; border-radius:12px;
+  font-family:var(--font); font-size:15px; font-weight:600; color:var(--label2); cursor:pointer;
+}
+.cal-confirm {
+  padding:12px; background:var(--blue); border:none; border-radius:12px;
+  font-family:var(--font); font-size:15px; font-weight:600; color:#fff; cursor:pointer;
+}
+.cal-confirm:active, .cal-cancel:active { opacity:.8; }
+
+.adv-btn { flex:0 !important; width:36px; padding:8px; display:flex; align-items:center; justify-content:center; color:var(--label3); overflow:visible !important; position:relative; }
+.adv-btn.active { background:rgba(0,122,255,0.15); color:var(--blue); }
+.adv-popover {
+  position:absolute; top:calc(100% + 8px); right:0;
+  background:var(--bg2); border-radius:16px;
+  box-shadow:0 8px 32px rgba(0,0,0,.25), 0 0 0 0.5px var(--sep);
+  padding:16px; width:280px; z-index:999;
+  display:none;
+}
+.adv-popover.open { display:block; }
+
+/* ── Auth Screen ─────────────────────────────── */
+#auth-screen {
+  position:fixed; inset:0; z-index:9000;
+  background:var(--bg); display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  padding:32px 24px calc(var(--safe-bot)+32px);
+}
+.auth-logo { font-size:32px; font-weight:800; letter-spacing:-1px; margin-bottom:8px; }
+.auth-logo span { color:var(--accent); }
+.auth-sub { font-size:14px; color:var(--label2); margin-bottom:40px; }
+.auth-card { background:var(--bg2); border-radius:20px; padding:24px; width:100%; max-width:380px; }
+.auth-tabs { display:grid; grid-template-columns:1fr 1fr; background:var(--fill); border-radius:12px; padding:3px; margin-bottom:24px; }
+.auth-tab { padding:9px; border:none; border-radius:10px; background:none; font-family:var(--font); font-size:14px; font-weight:600; color:var(--label2); cursor:pointer; transition:all .2s; }
+.auth-tab.active { background:var(--bg2); color:var(--label); box-shadow:0 1px 4px rgba(0,0,0,.15); }
+.auth-field { margin-bottom:14px; }
+.auth-label { display:block; font-size:11px; font-weight:600; color:var(--label2); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:6px; }
+.auth-input { width:100%; background:var(--fill); border:none; border-radius:12px; padding:13px 14px; font-family:var(--font); font-size:15px; color:var(--label); outline:none; transition:box-shadow .2s; }
+.auth-input:focus { box-shadow:0 0 0 2px var(--blue); }
+.auth-btn { width:100%; margin-top:8px; padding:15px; background:var(--blue); border:none; border-radius:12px; font-family:var(--font); font-size:16px; font-weight:700; color:#fff; cursor:pointer; transition:opacity .15s; }
+.auth-btn:active { opacity:.85; }
+.auth-btn:disabled { opacity:.5; cursor:not-allowed; }
+.auth-err { font-size:13px; color:var(--red); text-align:center; margin-top:10px; min-height:18px; }
+.auth-loading { font-size:14px; color:var(--label2); text-align:center; margin-top:10px; }
+</style>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-512.svg">
+</head>
+<body>
+<div id="auth-screen">
+  <div class="auth-logo">Bet<span>Tracker</span></div>
+  <div class="auth-sub">O teu registo de apostas</div>
+  <div class="auth-card">
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchAuthTab('login')">Entrar</button>
+      <button class="auth-tab" onclick="switchAuthTab('register')">Registar</button>
+    </div>
+    <div class="auth-field">
+      <label class="auth-label">Email</label>
+      <input type="email" id="auth-email" class="auth-input" placeholder="o-teu@email.com" autocomplete="email" onkeydown="if(event.key==='Enter')document.getElementById('auth-pass').focus()">
+    </div>
+    <div class="auth-field">
+      <label class="auth-label">Password</label>
+      <input type="password" id="auth-pass" class="auth-input" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doAuth()">
+    </div>
+    <button class="auth-btn" id="auth-btn" onclick="doAuth()">Entrar</button>
+    <div class="auth-err" id="auth-err"></div>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+
+  <div class="content">
+
+    <!-- ADD -->
+    <div id="page-add" class="page active">
+      <div class="ltitle-wrap" style="display:flex;align-items:center;justify-content:space-between"><div class="ltitle">Nova Aposta</div><button onclick="logout()" style="background:var(--fill);border:none;border-radius:10px;padding:8px 12px;font-family:var(--font);font-size:12px;font-weight:600;color:var(--label2);cursor:pointer">Sair</button></div>
+
+      <div class="sec-hdr">Detalhes</div>
+      <div class="ig">
+        <div class="ir">
+          <span class="il">Data</span>
+          <input type="date" class="if" id="f-data" style="text-align:right;width:auto;min-width:130px" onchange="checkForm()">
+        </div>
+        <div class="ir">
+          <span class="il">Plataforma</span>
+          <select class="if placeholder" id="f-casa" style="text-align:right;text-align-last:right" onchange="this.classList.toggle('placeholder',!this.value);checkForm()">
+            <option value="" disabled selected hidden>Selecionar</option>
+            <option>22Bet</option><option>Betclic</option>
+            <option>Betano</option><option>Café Prestígio</option><option>Outra</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="sec-hdr">Valores</div>
+      <div class="ig">
+        <div class="ir">
+          <span class="il">Gastos (€)</span>
+          <input type="number" class="if num" id="f-gastos" step="0.01" min="0" placeholder="0,00" oninput="autoCalc()">
+        </div>
+        <div class="ir">
+          <span class="il">Reembolso (€)</span>
+          <input type="number" class="if num" id="f-reembolso" step="0.01" min="0" placeholder="0,00" oninput="autoCalc()">
+        </div>
+        <div class="ir">
+          <span class="il">Lucro / Prej.</span>
+          <input type="number" class="if num" id="f-lucro" step="0.01" placeholder="0,00" oninput="styleLucro()">
+        </div>
+      </div>
+
+      <div class="sec-hdr">Resultado</div>
+      <div class="seg-wrap">
+        <button class="seg" data-res="Win" onclick="selRes(this)">
+          <span class="seg-icon">🏆</span>Win
+        </button>
+        <button class="seg" data-res="Lost" onclick="selRes(this)">
+          <span class="seg-icon">❌</span>Lost
+        </button>
+      </div>
+
+      <div class="sec-hdr">Notas</div>
+      <div class="ig">
+        <div class="ir">
+          <input type="text" class="if" id="f-notas" placeholder="Ex: Futebol, Liga Portugal…" style="text-align:left">
+        </div>
+      </div>
+
+      <button class="btn-primary" id="btn-save" onclick="saveBet()" disabled>Registar Aposta</button>
+      <div class="pb"></div>
+    </div>
+
+    <!-- EDIT -->
+    <div id="page-edit" class="page">
+      <div class="ltitle-wrap" style="display:flex;align-items:center;justify-content:space-between"><div class="ltitle">Editar Aposta</div><button onclick="logout()" style="background:var(--fill);border:none;border-radius:10px;padding:8px 12px;font-family:var(--font);font-size:12px;font-weight:600;color:var(--label2);cursor:pointer">Sair</button></div>
+
+      <div class="sec-hdr">Detalhes</div>
+      <div class="ig">
+        <div class="ir">
+          <span class="il">Data</span>
+          <input type="date" class="if" id="e-data" style="text-align:right;width:auto;min-width:130px" onchange="checkEditForm()">
+        </div>
+        <div class="ir">
+          <span class="il">Plataforma</span>
+          <select class="if" id="e-casa" style="text-align:right;text-align-last:right" onchange="checkEditForm()">
+            <option value="" disabled hidden>Selecionar</option>
+            <option>22Bet</option><option>Betclic</option>
+            <option>Betano</option><option>Café Prestígio</option><option>Outra</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="sec-hdr">Valores</div>
+      <div class="ig">
+        <div class="ir">
+          <span class="il">Gastos (€)</span>
+          <input type="number" class="if num" id="e-gastos" step="0.01" min="0" placeholder="0,00" oninput="autoCalcEdit()">
+        </div>
+        <div class="ir">
+          <span class="il">Reembolso (€)</span>
+          <input type="number" class="if num" id="e-reembolso" step="0.01" min="0" placeholder="0,00" oninput="autoCalcEdit()">
+        </div>
+        <div class="ir">
+          <span class="il">Lucro / Prej.</span>
+          <input type="number" class="if num" id="e-lucro" step="0.01" placeholder="0,00" oninput="styleLucroEdit()">
+        </div>
+      </div>
+
+      <div class="sec-hdr">Resultado</div>
+      <div class="seg-wrap">
+        <button class="seg" data-res="Win" onclick="selResEdit(this)">
+          <span class="seg-icon">🏆</span>Win
+        </button>
+        <button class="seg" data-res="Lost" onclick="selResEdit(this)">
+          <span class="seg-icon">❌</span>Lost
+        </button>
+      </div>
+
+      <div class="sec-hdr">Notas</div>
+      <div class="ig">
+        <div class="ir">
+          <input type="text" class="if" id="e-notas" placeholder="Ex: Futebol, Liga Portugal…" style="text-align:left">
+        </div>
+      </div>
+
+      <button class="btn-primary" id="btn-edit-save" onclick="updateBet()" disabled>Guardar Alterações</button>
+      <div class="pb"></div>
+    </div>
+
+    <!-- HISTORY -->
+    <div id="page-history" class="page">
+      <div class="ltitle-wrap" style="display:flex;align-items:center;justify-content:space-between">
+        <div class="ltitle">Histórico</div>
+        <button onclick="logout()" style="background:var(--fill);border:none;border-radius:10px;padding:8px 12px;font-family:var(--font);font-size:12px;font-weight:600;color:var(--label2);cursor:pointer">Sair</button>
+      </div>
+
+      <!-- Plataforma -->
+      <div class="frow" style="padding-bottom:0">
+        <select class="fpill" id="h-casa" onchange="renderHistory()">
+          <option value="">Plataforma</option>
+        </select>
+      </div>
+
+      <div class="frow" style="padding-bottom:4px">
+        <select class="fpill" id="h-mes" onchange="renderHistory()">
+          <option value="">Mês</option>
+          <option value="0">Janeiro</option><option value="1">Fevereiro</option>
+          <option value="2">Março</option><option value="3">Abril</option>
+          <option value="4">Maio</option><option value="5">Junho</option>
+          <option value="6">Julho</option><option value="7">Agosto</option>
+          <option value="8">Setembro</option><option value="9">Outubro</option>
+          <option value="10">Novembro</option><option value="11">Dezembro</option>
+        </select>
+        <select class="fpill" id="h-ano" onchange="renderHistory()">
+          <option value="">Ano</option>
+        </select>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:0">
+          <div style="position:relative;flex:0">
+            <button class="fpill adv-btn" id="adv-btn" onclick="openAdvFilters(event)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+            </button>
+            <div class="adv-popover" id="adv-popover" onclick="event.stopPropagation()">
+              <div style="display:flex;flex-direction:column;gap:8px;margin:0 0 12px">
+                <div>
+                  <div style="font-size:11px;font-weight:600;color:var(--label2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;padding:0 4px">De</div>
+                  <input type="date" id="adv-from" onchange="syncAdvDate('from')"
+                    style="width:100%;background:var(--fill);border:none;border-radius:12px;padding:13px 14px;font-family:var(--font);font-size:15px;color:var(--label);outline:none;box-sizing:border-box;cursor:pointer">
+                </div>
+                <div>
+                  <div style="font-size:11px;font-weight:600;color:var(--label2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;padding:0 4px">Até</div>
+                  <input type="date" id="adv-to" onchange="syncAdvDate('to')"
+                    style="width:100%;background:var(--fill);border:none;border-radius:12px;padding:13px 14px;font-family:var(--font);font-size:15px;color:var(--label);outline:none;box-sizing:border-box;cursor:pointer">
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <button onclick="clearAdvFilters()" style="padding:11px;background:var(--fill);border:none;border-radius:10px;font-family:var(--font);font-size:14px;font-weight:600;color:var(--label2);cursor:pointer">Limpar</button>
+                <button onclick="applyAdvFilters()" style="padding:11px;background:var(--blue);border:none;border-radius:10px;font-family:var(--font);font-size:14px;font-weight:600;color:#fff;cursor:pointer">Aplicar</button>
+              </div>
+            </div>
+          </div>
+          <span style="font-size:10px;color:var(--label3);pointer-events:none">📅</span>
+        </div>
+      </div>
+
+      <div id="h-sum" class="sum-card" style="display:none">
+        <div class="si"><div class="si-l">Apostas</div><div class="si-v" id="h-count">0</div></div>
+        <div class="si"><div class="si-l">Gastos</div><div class="si-v" id="h-gastos">0 €</div></div>
+        <div class="si"><div class="si-l">Lucro</div><div class="si-v" id="h-lucro">0 €</div></div>
+      </div>
+
+      <div class="blist" id="history-list"></div>
+      <div class="pb"></div>
+    </div>
+
+    <!-- ANALYTICS -->
+    <div id="page-analytics" class="page">
+      <div class="ltitle-wrap" style="display:flex;align-items:center;justify-content:space-between"><div class="ltitle">Análise</div><button onclick="logout()" style="background:var(--fill);border:none;border-radius:10px;padding:8px 12px;font-family:var(--font);font-size:12px;font-weight:600;color:var(--label2);cursor:pointer">Sair</button></div>
+
+      <div class="frow">
+        <select class="fpill" id="a-ano" onchange="renderAnalytics()">
+          <option value="">Todos os anos</option>
+        </select>
+      </div>
+
+      <div class="stat-grid">
+        <div class="sc">
+          <div class="sc-l">Total Gastos</div>
+          <div class="sc-v" id="a-gastos">0 €</div>
+        </div>
+        <div class="sc">
+          <div class="sc-l">Lucro / Prej.</div>
+          <div class="sc-v" id="a-lucro">0 €</div>
+        </div>
+        <div class="sc">
+          <div class="sc-l">Apostas</div>
+          <div class="sc-v" id="a-count" style="color:var(--blue)">0</div>
+        </div>
+        <div class="sc">
+          <div class="sc-l">Taxa de Vitória</div>
+          <div class="sc-v" id="a-wr" style="color:var(--orange)">—</div>
+          <div class="sc-s" id="a-wrs"></div>
+        </div>
+      </div>
+
+      <div class="sec-hdr">Por Casa de Apostas</div>
+      <div class="cg" id="a-casas"></div>
+
+      <div class="sec-hdr">Por Mês</div>
+      <div class="cg" style="padding:8px 0" id="a-months"></div>
+
+      <div class="sec-hdr" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px">
+        <span>Atividade — Lucro/Prejuízo por Mês</span>
+        <select id="hm-ano" onchange="renderHeatmapOnly()" style="background:var(--fill);border:none;border-radius:8px;padding:4px 8px;font-family:var(--font);font-size:12px;font-weight:600;color:var(--label2);cursor:pointer;appearance:none;-webkit-appearance:none">
+          <option value="">Todos</option>
+        </select>
+      </div>
+      <div class="hm-monthly-wrap" id="hm-monthly"></div>
+      <div class="hm-legend">
+        <span class="hm-legend-lbl">Prejuízo</span>
+        <div class="hm-legend-cell" style="background:#ef4444"></div>
+        <div class="hm-legend-cell" style="background:#b91c1c"></div>
+        <div class="hm-legend-cell" style="background:#1e1e2e"></div>
+        <div class="hm-legend-cell" style="background:#2d6a4f"></div>
+        <div class="hm-legend-cell" style="background:#52b788"></div>
+        <div class="hm-legend-cell" style="background:#34d399"></div>
+        <span class="hm-legend-lbl">Lucro</span>
+      </div>
+      <div id="hm-tooltip" class="hm-tooltip" style="display:none"></div>
+
+      <div class="pb"></div>
+    </div>
+
+  </div><!-- /content -->
+
+  <div class="tabbar">
+    <button class="tab-btn active" onclick="goTab('add',this)">
+      <div class="tab-ic">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/>
+          <line x1="8" y1="12" x2="16" y2="12"/>
+        </svg>
+      </div>
+      Nova
+    </button>
+    <button class="tab-btn" onclick="goTab('history',this)">
+      <div class="tab-ic">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M9 11l3 3L22 4"/>
+          <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+        </svg>
+      </div>
+      Histórico
+    </button>
+    <button class="tab-btn" onclick="goTab('analytics',this)">
+      <div class="tab-ic">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="18" y1="20" x2="18" y2="10"/>
+          <line x1="12" y1="20" x2="12" y2="4"/>
+          <line x1="6"  y1="20" x2="6"  y2="14"/>
+        </svg>
+      </div>
+      Análise
+    </button>
+  </div>
+
+</div>
+
+<!-- Action Sheet -->
+<div class="ov" id="ov">
+  <div class="as">
+    <div class="as-main">
+      <div class="as-title">
+        <h3>Apagar aposta?</h3>
+        <p>Esta ação não pode ser desfeita.</p>
+      </div>
+      <button class="as-btn red" onclick="confirmDel()">Apagar</button>
+    </div>
+    <button class="as-cancel" onclick="cancelDel()">Cancelar</button>
+  </div>
+</div>
+
+<script>
+// ── Supabase REST API (no SDK needed) ─────────
+const SUPA_URL = 'https://oolqasggtevxspsjhday.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9vbHFhc2dndGV2eHNwc2poZGF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyMTA2MjgsImV4cCI6MjA5Mzc4NjYyOH0.W29UVyuZt14cf2FC19Qh-K4LDCtbKMOfN6KSOHFZLbc';
+let currentUser = null;
+let _accessToken = null;
+
+const supa = {
+  headers(token, isAuth) {
+    const h = {
+      'Content-Type':'application/json',
+      'apikey':SUPA_KEY,
+    };
+    const t = token||_accessToken;
+    if(t) h['Authorization'] = 'Bearer '+t;
+    else if(!isAuth) h['Authorization'] = 'Bearer '+SUPA_KEY;
+    return h;
+  },
+  async post(path, body, token) {
+    const isAuth = path.startsWith('/auth/');
+    const r = await fetch(SUPA_URL+path, {
+      method:'POST',
+      headers:this.headers(token, isAuth),
+      body:JSON.stringify(body),
+      mode:'cors',
+      credentials:'omit'
+    });
+    const text = await r.text();
+    try { return JSON.parse(text); } 
+    catch(e) { return {error: text, status: r.status}; }
+  },
+  async get(path, token) {
+    const isAuth = path.startsWith('/auth/');
+    const r = await fetch(SUPA_URL+path, {
+      method:'GET',
+      headers:{...this.headers(token, isAuth),'Prefer':'count=exact'},
+      mode:'cors',
+      credentials:'omit'
+    });
+    const text = await r.text();
+    let data;
+    try { data = JSON.parse(text); } catch(e) { data = []; }
+    const count = parseInt(r.headers.get('content-range')?.split('/')[1])||0;
+    return {data, count};
+  },
+  async upsert(table, body, token) {
+    const r = await fetch(SUPA_URL+'/rest/v1/'+table, {
+      method:'POST',
+      headers:{...this.headers(token),'Prefer':'resolution=merge-duplicates'},
+      body:JSON.stringify(body)
+    });
+    return r.ok ? {error:null} : {error: await r.json()};
+  },
+  async delete(table, params, token) {
+    const r = await fetch(SUPA_URL+'/rest/v1/'+table+'?'+params, {
+      method:'DELETE', headers:this.headers(token)
+    });
+    return r.ok ? {error:null} : {error: await r.json()};
+  }
+};
+
+// ── Auth ──────────────────────────────────────
+let authMode = 'login';
+function switchAuthTab(mode) {
+  authMode = mode;
+  document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', (mode==='login'&&i===0)||(mode==='register'&&i===1)));
+  document.getElementById('auth-btn').textContent = mode==='login' ? 'Entrar' : 'Criar conta';
+  document.getElementById('auth-err').textContent = '';
+}
+
+async function doAuth() {
+  const email = document.getElementById('auth-email').value.trim();
+  const pass  = document.getElementById('auth-pass').value;
+  const btn   = document.getElementById('auth-btn');
+  const err   = document.getElementById('auth-err');
+  if(!email||!pass) { err.textContent='Preenche email e password.'; return; }
+  btn.disabled = true;
+  btn.textContent = authMode==='login' ? 'A entrar…' : 'A criar conta…';
+  err.textContent = '';
+
+  try {
+    const endpoint = authMode==='login' ? '/auth/v1/token?grant_type=password' : '/auth/v1/signup';
+    const res = await supa.post(endpoint, {email, password:pass});
+
+    btn.disabled = false;
+    btn.textContent = authMode==='login' ? 'Entrar' : 'Criar conta';
+
+    // Handle errors
+    if(res.error || res.error_description || res.code || res.msg) {
+      err.style.color = 'var(--red)';
+      const errCode = res.error_code || '';
+      const errMsg = res.msg || res.error_description || res.message || res.error || '';
+      if(errCode === 'over_email_send_rate_limit') {
+        err.textContent = 'Limite de emails atingido. Aguarda alguns minutos e tenta novamente.';
+      } else if(errCode === 'email_not_confirmed') {
+        err.textContent = 'Email não confirmado. Verifica a tua caixa de entrada.';
+      } else if(errCode === 'invalid_credentials') {
+        err.textContent = 'Email ou password incorretos.';
+      } else if(errCode === 'user_already_exists') {
+        err.textContent = 'Este email já está registado. Tenta entrar.';
+      } else {
+        err.textContent = errMsg || 'Erro desconhecido. Tenta novamente.';
+      }
+      return;
+    }
+
+    if(authMode==='register') {
+      // Supabase returns user object even with email confirmation pending
+      err.style.color = 'var(--green)';
+      err.textContent = 'Conta criada! Verifica o teu email para confirmar e depois entra.';
+      // Switch to login tab
+      setTimeout(() => switchAuthTab('login'), 2000);
+      return;
+    }
+
+    // Login
+    if(!res.access_token) {
+      err.style.color = 'var(--red)';
+      err.textContent = 'Email ou password incorretos.';
+      return;
+    }
+    _accessToken = res.access_token;
+    currentUser = res.user;
+    localStorage.setItem('supa_token', _accessToken);
+    localStorage.setItem('supa_user', JSON.stringify(currentUser));
+    showApp();
+
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = authMode==='login' ? 'Entrar' : 'Criar conta';
+    err.style.color = 'var(--red)';
+    err.textContent = 'Erro de ligação. Verifica a tua internet.';
+    console.error('Auth error:', e);
+  }
+}
+
+function showApp() {
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  init();
+}
+
+async function checkSession() {
+  const token = localStorage.getItem('supa_token');
+  const user  = localStorage.getItem('supa_user');
+  if(token && user) {
+    _accessToken = token;
+    currentUser = JSON.parse(user);
+    // Verify token is still valid
+    try {
+      const res = await supa.get('/auth/v1/user', token);
+      if(res.data && res.data.id) {
+        currentUser = res.data;
+        showApp();
+        return;
+      }
+    } catch(e) {}
+    localStorage.removeItem('supa_token');
+    localStorage.removeItem('supa_user');
+  }
+}
+
+async function logout() {
+  try { await supa.post('/auth/v1/logout', {}, _accessToken); } catch(e) {}
+  _accessToken = null; currentUser = null; bets = [];
+  localStorage.removeItem('supa_token');
+  localStorage.removeItem('supa_user');
+  document.getElementById('app').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+}
+
+// ── DB operations ─────────────────────────────
+// ── Plataformas ───────────────────────────────
+let plataformas = []; // [{id, nome}]
+
+async function loadPlataformas() {
+  const {data} = await supa.get(
+    `/rest/v1/plataformas?user_id=eq.${currentUser.id}&order=nome.asc`,
+    _accessToken
+  );
+  plataformas = Array.isArray(data) ? data : [];
+  // Seed default platforms if none exist
+  if(plataformas.length === 0) await seedPlataformas();
+  else buildPlataformaSelects();
+}
+
+async function seedPlataformas() {
+  const defaults = ['22Bet','Betclic','Betano','Café Prestígio'];
+  for(const nome of defaults) {
+    await supa.upsert('plataformas', {
+      user_id: currentUser.id, nome
+    }, _accessToken);
+  }
+  await loadPlataformas();
+}
+
+async function addPlataforma(nome) {
+  const {error} = await supa.upsert('plataformas', {
+    user_id: currentUser.id, nome
+  }, _accessToken);
+  if(error){ console.error('Add plataforma error:', error); return null; }
+  await loadPlataformas();
+  return plataformas.find(p => p.nome === nome);
+}
+
+function buildPlataformaSelects() {
+  const selects = ['f-casa', 'e-casa', 'h-casa'];
+  selects.forEach(id => {
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    const current = sel.value;
+    // Keep first option (placeholder or "Todas as casas")
+    while(sel.options.length > 1) sel.remove(1);
+    plataformas.forEach(p => sel.add(new Option(p.nome, p.nome)));
+    if(id === 'f-casa' || id === 'e-casa') sel.add(new Option('+ Nova plataforma', '__nova__'));
+    if(current) sel.value = current;
+  });
+}
+
+async function handlePlataformaChange(selId, newFieldId) {
+  const sel = document.getElementById(selId);
+  const newField = document.getElementById(newFieldId);
+  if(sel.value === '__nova__') {
+    sel.value = '';
+    newField.style.display = 'flex';
+    document.getElementById(newFieldId + '-input').focus();
+  } else {
+    newField.style.display = 'none';
+  }
+  if(selId === 'f-casa' || selId === 'e-casa') checkForm();
+}
+
+async function confirmNovaPlataforma(inputId, selId, newFieldId) {
+  const input = document.getElementById(inputId);
+  const nome = input.value.trim();
+  if(!nome) return;
+  // Check duplicate
+  if(plataformas.find(p => p.nome.toLowerCase() === nome.toLowerCase())) {
+    document.getElementById(selId).value = plataformas.find(p => p.nome.toLowerCase() === nome.toLowerCase()).nome;
+    document.getElementById(newFieldId).style.display = 'none';
+    input.value = '';
+    return;
+  }
+  await addPlataforma(nome);
+  document.getElementById(selId).value = nome;
+  document.getElementById(newFieldId).style.display = 'none';
+  input.value = '';
+  if(selId === 'f-casa' || selId === 'e-casa') checkForm();
+}
+
+async function loadFromDB() {
+  const {data} = await supa.get(
+    `/rest/v1/apostas?user_id=eq.${currentUser.id}&order=data.desc`,
+    _accessToken
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+async function saveToDB(bet) {
+  const {error} = await supa.upsert('apostas', {
+    id: bet.id, user_id: currentUser.id,
+    data: bet.data, casa: bet.casa, resultado: bet.resultado,
+    gastos: bet.gastos, reembolso: bet.reembolso, lucro: bet.lucro, notas: bet.notas||'',
+    plataforma_id: bet.plataforma_id || null
+  }, _accessToken);
+  if(error) console.error('Save error:', error);
+}
+
+async function deleteFromDB(id) {
+  const {error} = await supa.delete('apostas', `id=eq.${id}&user_id=eq.${currentUser.id}`, _accessToken);
+  if(error) console.error('Delete error:', error);
+}
+
+
+const MONTHS=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const COLORS={'22Bet':'#FF9500','Betclic':'#007AFF','Betano':'#FF3B30','Café Prestígio':'#34C759','Outra':'#5856D6'};
+const ICON_DOMAINS={'22Bet':'22bet21.com','Betclic':'betclic.pt','Betano':'betano.com'};
+const ICON_EMOJIS={'Café Prestígio':'☕','Outra':'🎲'};
+function iconErr1(img,d){img.src='https://www.google.com/s2/favicons?domain='+d+'&sz=64';img.onerror=function(){iconErr2(img);};}
+function iconErr2(img){var p=img.parentNode;img.remove();p.textContent='🎲';p.style.fontSize='20px';}
+const ICON_DIRECT={'22Bet':'https://www.22bet21.com/favicon.ico'};
+function casaIcon(c){
+  if(ICON_EMOJIS[c]) return '<div class="c-icon" style="background:transparent">'+ICON_EMOJIS[c]+'</div>';
+  const d=ICON_DOMAINS[c];
+  if(!d) return '<div class="c-icon">🎲</div>';
+  const primary=ICON_DIRECT[c]||('https://logo.clearbit.com/'+d);
+  return '<div class="c-icon" style="background:transparent"><img src="'+primary+'" onerror="iconErr1(this,\''+d+'\')" style="width:36px;height:36px;border-radius:10px;object-fit:cover"></div>';
+}
+const TABS={add:'Nova Aposta',history:'Histórico',analytics:'Análise'};
+
 function eur(v){return new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(v||0);}
 function eurS(v){return(v>=0?'+':'')+eur(v);}
 function bc(r){return{Win:'won',Lost:'lost',Ganhou:'won',Perdeu:'lost'}[r]||'lost';}
@@ -1116,9 +2273,9 @@ async function init(){
   document.getElementById('f-data').value=new Date().toISOString().slice(0,10);
   
   // Migrate historical data if first login
-  await migrateHistorical();
   
   // Load from DB
+  await loadPlataformas();
   bets = await loadFromDB();
   
   updateHdr(); buildYears(); renderHistory(); renderAnalytics();
