@@ -678,14 +678,18 @@ select.fpill.active, button.fpill.active { background:var(--blue); color:#fff; }
             </button>
             <div class="adv-popover" id="adv-popover" onclick="event.stopPropagation()">
               <div class="ig" style="margin:0 0 12px">
-                <label class="ir" for="adv-from" style="cursor:pointer">
+                <div class="ir" style="position:relative">
                   <span class="il">De</span>
-                  <input type="date" class="if" id="adv-from" onchange="syncAdvDate('from')" style="text-align:right;width:auto;min-width:130px;pointer-events:none">
-                </label>
-                <label class="ir" for="adv-to" style="cursor:pointer">
+                  <input type="date" class="if" id="adv-from" onchange="syncAdvDate('from')"
+                    style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:2">
+                  <span class="if" id="adv-from-display" style="color:var(--label);text-align:right;pointer-events:none">dd/mm/aaaa</span>
+                </div>
+                <div class="ir" style="position:relative">
                   <span class="il">Até</span>
-                  <input type="date" class="if" id="adv-to" onchange="syncAdvDate('to')" style="text-align:right;width:auto;min-width:130px;pointer-events:none">
-                </label>
+                  <input type="date" class="if" id="adv-to" onchange="syncAdvDate('to')"
+                    style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:2">
+                  <span class="if" id="adv-to-display" style="color:var(--label);text-align:right;pointer-events:none">dd/mm/aaaa</span>
+                </div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
                 <button onclick="clearAdvFilters()" style="padding:11px;background:var(--fill);border:none;border-radius:10px;font-family:var(--font);font-size:14px;font-weight:600;color:var(--label2);cursor:pointer">Limpar</button>
@@ -1161,6 +1165,7 @@ function openAdvFilters(e){
   const jan1 = new Date().getFullYear() + '-01-01';
   if(advFrom) advFrom.value=(hFrom&&hFrom.value)?hFrom.value:jan1;
   if(advTo) advTo.value=(hTo&&hTo.value)?hTo.value:today;
+  updateAdvDisplays();
   const min=window._drMin||''; const max=window._drMax||'';
   ['adv-from','adv-to'].forEach(id=>{
     const el=document.getElementById(id);
@@ -1181,6 +1186,16 @@ function syncAdvDate(field){
   const to=document.getElementById('adv-to').value;
   if(field==='from'&&from&&to&&from>to) document.getElementById('adv-from').value=to;
   if(field==='to'&&from&&to&&to<from) document.getElementById('adv-to').value=from;
+  updateAdvDisplays();
+}
+function updateAdvDisplays(){
+  const fmt=v=>v?new Date(v+'T12:00:00').toLocaleDateString('pt-PT'):'dd/mm/aaaa';
+  const fd=document.getElementById('adv-from-display');
+  const td=document.getElementById('adv-to-display');
+  const fv=document.getElementById('adv-from')?.value||'';
+  const tv=document.getElementById('adv-to')?.value||'';
+  if(fd) fd.textContent=fmt(fv);
+  if(td) td.textContent=fmt(tv);
 }
 function closeAdvFilters(){
   const pop=document.getElementById('adv-popover');
