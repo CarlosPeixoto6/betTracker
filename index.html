@@ -677,14 +677,16 @@ select.fpill.active, button.fpill.active { background:var(--blue); color:#fff; }
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
             </button>
             <div class="adv-popover" id="adv-popover" onclick="event.stopPropagation()">
-              <div class="ig" style="margin:0 0 12px">
-                <div class="ir">
-                  <span class="il">De</span>
-                  <input type="date" class="if" id="adv-from" onchange="syncAdvDate('from')" style="flex:1;text-align:right;cursor:pointer">
+              <div style="display:flex;flex-direction:column;gap:8px;margin:0 0 12px">
+                <div>
+                  <div style="font-size:11px;font-weight:600;color:var(--label2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;padding:0 4px">De</div>
+                  <input type="date" id="adv-from" onchange="syncAdvDate('from')"
+                    style="width:100%;background:var(--fill);border:none;border-radius:12px;padding:13px 14px;font-family:var(--font);font-size:15px;color:var(--label);outline:none;box-sizing:border-box;cursor:pointer">
                 </div>
-                <div class="ir">
-                  <span class="il">Até</span>
-                  <input type="date" class="if" id="adv-to" onchange="syncAdvDate('to')" style="flex:1;text-align:right;cursor:pointer">
+                <div>
+                  <div style="font-size:11px;font-weight:600;color:var(--label2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;padding:0 4px">Até</div>
+                  <input type="date" id="adv-to" onchange="syncAdvDate('to')"
+                    style="width:100%;background:var(--fill);border:none;border-radius:12px;padding:13px 14px;font-family:var(--font);font-size:15px;color:var(--label);outline:none;box-sizing:border-box;cursor:pointer">
                 </div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
