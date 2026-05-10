@@ -1148,7 +1148,11 @@ function setDateRangeLimits(){
 let _calField='from', _calYear=new Date().getFullYear(), _calMonth=new Date().getMonth(), _calSel='';
 const MNAMES_PT=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-function openAdvFilters(){
+function openAdvFilters(e){
+  if(e) e.stopPropagation();
+  const popover = document.getElementById('adv-popover');
+  const isOpen = popover.classList.contains('open');
+  if(isOpen){ closeAdvFilters(); return; }
   const hFrom=document.getElementById('h-from');
   const hTo=document.getElementById('h-to');
   const advFrom=document.getElementById('adv-from');
@@ -1160,7 +1164,15 @@ function openAdvFilters(){
     const el=document.getElementById(id);
     if(el){ el.min=min; el.max=max; }
   });
-  document.getElementById('adv-overlay').style.display='flex';
+  popover.classList.add('open');
+  document.getElementById('adv-btn').classList.add('active');
+  setTimeout(()=>document.addEventListener('click', _closeOnOutside), 0);
+}
+function _closeOnOutside(e){
+  const pop=document.getElementById('adv-popover');
+  if(pop && !pop.contains(e.target) && e.target.id!=='adv-btn'){
+    closeAdvFilters();
+  }
 }
 function syncAdvDate(field){
   const from=document.getElementById('adv-from').value;
@@ -1169,7 +1181,10 @@ function syncAdvDate(field){
   if(field==='to'&&from&&to&&to<from) document.getElementById('adv-to').value=from;
 }
 function closeAdvFilters(){
-  document.getElementById('adv-overlay').style.display='none';
+  const pop=document.getElementById('adv-popover');
+  if(pop) pop.classList.remove('open');
+  document.getElementById('adv-btn').classList.remove('active');
+  document.removeEventListener('click', _closeOnOutside);
 }
 function clearAdvFilters(){
   closeAdvFilters();
