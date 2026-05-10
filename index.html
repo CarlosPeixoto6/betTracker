@@ -678,17 +678,13 @@ select.fpill.active, button.fpill.active { background:var(--blue); color:#fff; }
             </button>
             <div class="adv-popover" id="adv-popover" onclick="event.stopPropagation()">
               <div class="ig" style="margin:0 0 12px">
-                <div class="ir" style="position:relative">
+                <div class="ir">
                   <span class="il">De</span>
-                  <input type="date" class="if" id="adv-from" onchange="syncAdvDate('from')"
-                    style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:2">
-                  <span class="if" id="adv-from-display" style="color:var(--label);text-align:right;pointer-events:none">dd/mm/aaaa</span>
+                  <input type="date" class="if" id="adv-from" onchange="syncAdvDate('from')" style="flex:1;text-align:right;cursor:pointer">
                 </div>
-                <div class="ir" style="position:relative">
+                <div class="ir">
                   <span class="il">Até</span>
-                  <input type="date" class="if" id="adv-to" onchange="syncAdvDate('to')"
-                    style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:2">
-                  <span class="if" id="adv-to-display" style="color:var(--label);text-align:right;pointer-events:none">dd/mm/aaaa</span>
+                  <input type="date" class="if" id="adv-to" onchange="syncAdvDate('to')" style="flex:1;text-align:right;cursor:pointer">
                 </div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -1165,7 +1161,6 @@ function openAdvFilters(e){
   const jan1 = new Date().getFullYear() + '-01-01';
   if(advFrom) advFrom.value=(hFrom&&hFrom.value)?hFrom.value:jan1;
   if(advTo) advTo.value=(hTo&&hTo.value)?hTo.value:today;
-  updateAdvDisplays();
   const min=window._drMin||''; const max=window._drMax||'';
   ['adv-from','adv-to'].forEach(id=>{
     const el=document.getElementById(id);
@@ -1186,7 +1181,6 @@ function syncAdvDate(field){
   const to=document.getElementById('adv-to').value;
   if(field==='from'&&from&&to&&from>to) document.getElementById('adv-from').value=to;
   if(field==='to'&&from&&to&&to<from) document.getElementById('adv-to').value=from;
-  updateAdvDisplays();
 }
 function updateAdvDisplays(){
   const fmt=v=>v?new Date(v+'T12:00:00').toLocaleDateString('pt-PT'):'dd/mm/aaaa';
