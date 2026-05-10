@@ -269,12 +269,12 @@ select.fpill.active, button.fpill.active { background:var(--blue); color:#fff; }
 
 @media (min-width: 600px) {
   /* Tab bar becomes a sidebar on desktop */
-  #app { flex-direction:row; flex-wrap:wrap; }
+  #app { flex-direction:row; }
   .tabbar {
-    flex-direction:column; width:220px; order:1;
+    flex-direction:column; width:220px; flex-shrink:0;
     border-top:none; border-right:0.5px solid var(--sep);
-    padding-bottom:0; padding-top:16px; height:calc(100dvh - 44px - var(--safe-top));
-    position:sticky; top:calc(44px + var(--safe-top));
+    padding-bottom:0; padding-top:16px;
+    height:100dvh; position:sticky; top:0;
   }
   .tab-btn {
     flex:none; flex-direction:row; gap:12px;
@@ -283,38 +283,32 @@ select.fpill.active, button.fpill.active { background:var(--blue); color:#fff; }
   }
   .tab-ic { width:32px; height:32px; border-radius:9px; }
   .tab-btn svg { width:20px; height:20px; }
-  .content { order:2; flex:1; height:calc(100dvh - 44px - var(--safe-top)); }
+  .content { order:2; flex:1; min-width:0; height:100dvh; overflow-y:auto; }
 
-  /* Larger padding and fonts */
+  /* Constrain all page content to max-width */
+  .page { max-width:720px; margin:0 auto; padding:24px; }
+
+  /* Reset element margins to rely on page padding */
   .ltitle { font-size:28px; }
-  .ltitle-wrap { padding:20px 24px 10px; }
-  .sec-hdr { padding:16px 24px 6px; }
-  .ig { margin:0 24px 6px; }
-  .seg-wrap { margin:0 24px 6px; }
-  .stat-grid { margin:0 24px 6px; }
-  .cg { margin:0 24px 6px; }
-  .blist { padding:0 24px; }
-  .btn-primary { width:calc(100% - 48px); margin-left:24px; margin-right:24px; }
-  .frow { padding:8px 24px 4px; }
-  .sum-card { margin:0 24px 8px; }
-  .month-chart { margin:0 24px 6px; }
-
-  /* Two-column grid for analytics stats */
-  .stat-grid { grid-template-columns:repeat(4,1fr); }
-
-  /* Form rows wider */
-  .ir { padding:0 20px; }
+  .ltitle-wrap { padding:4px 0 10px; }
+  .sec-hdr { padding:16px 0 6px; }
+  .ig { margin:0 0 6px; }
+  .seg-wrap { margin:0 0 6px; }
+  .stat-grid { margin:0 0 6px; grid-template-columns:repeat(4,1fr); }
+  .cg { margin:0 0 6px; }
+  .blist { padding:0; }
+  .btn-primary { width:100%; margin-left:0; margin-right:0; }
+  .frow { padding:8px 0 4px; }
+  .sum-card { margin:0 0 8px; }
+  .month-chart { margin:0 0 6px; }
+  .ir { padding:0 16px; }
+  .date-range-row { padding:4px 0 8px; }
+  .hm-monthly-wrap { margin:0 0 6px; }
 }
 
 @media (min-width: 1024px) {
   .tabbar { width:260px; }
-  .content-inner { max-width:860px; }
-  .ig, .seg-wrap, .stat-grid, .cg, .blist, .frow, .sum-card, .month-chart { 
-    max-width:860px; margin-left:auto; margin-right:auto;
-  }
-  .ig { margin-left:auto; margin-right:auto; }
-  .btn-primary { max-width:860px; }
-  .stat-grid { grid-template-columns:repeat(4,1fr); }
+  .page { max-width:860px; }
 }
 
 /* ── Heatmap ─────────────────────────────────────── */
@@ -534,7 +528,7 @@ select.fpill.active, button.fpill.active { background:var(--blue); color:#fff; }
       <div class="ig">
         <div class="ir">
           <span class="il">Data</span>
-          <input type="date" class="if" id="f-data" style="flex:0;width:auto;margin-left:auto" onchange="checkForm()">
+          <input type="date" class="if" id="f-data" style="text-align:right;width:auto;min-width:130px" onchange="checkForm()">
         </div>
         <div class="ir">
           <span class="il">Plataforma</span>
@@ -591,7 +585,7 @@ select.fpill.active, button.fpill.active { background:var(--blue); color:#fff; }
       <div class="ig">
         <div class="ir">
           <span class="il">Data</span>
-          <input type="date" class="if" id="e-data" style="flex:0;width:auto;margin-left:auto" onchange="checkEditForm()">
+          <input type="date" class="if" id="e-data" style="text-align:right;width:auto;min-width:130px" onchange="checkEditForm()">
         </div>
         <div class="ir">
           <span class="il">Plataforma</span>
@@ -1694,11 +1688,11 @@ function renderHeatmap(fl, ano){
     <div class="ig">
       <div class="ir">
         <span class="il">De</span>
-        <input type="date" class="if" id="adv-from" onchange="syncAdvDate('from')" style="flex:0;width:auto;margin-left:auto">
+        <input type="date" class="if" id="adv-from" onchange="syncAdvDate('from')" style="text-align:right;width:auto;min-width:130px">
       </div>
       <div class="ir">
         <span class="il">Até</span>
-        <input type="date" class="if" id="adv-to" onchange="syncAdvDate('to')" style="flex:0;width:auto;margin-left:auto">
+        <input type="date" class="if" id="adv-to" onchange="syncAdvDate('to')" style="text-align:right;width:auto;min-width:130px">
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px">
