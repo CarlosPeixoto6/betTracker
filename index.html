@@ -678,14 +678,14 @@ select.fpill.active, button.fpill.active { background:var(--blue); color:#fff; }
             </button>
             <div class="adv-popover" id="adv-popover" onclick="event.stopPropagation()">
               <div class="ig" style="margin:0 0 12px">
-                <div class="ir">
+                <label class="ir" for="adv-from" style="cursor:pointer">
                   <span class="il">De</span>
-                  <input type="date" class="if" id="adv-from" onchange="syncAdvDate('from')" style="text-align:right;width:auto;min-width:130px">
-                </div>
-                <div class="ir">
+                  <input type="date" class="if" id="adv-from" onchange="syncAdvDate('from')" style="text-align:right;width:auto;min-width:130px;pointer-events:none">
+                </label>
+                <label class="ir" for="adv-to" style="cursor:pointer">
                   <span class="il">Até</span>
-                  <input type="date" class="if" id="adv-to" onchange="syncAdvDate('to')" style="text-align:right;width:auto;min-width:130px">
-                </div>
+                  <input type="date" class="if" id="adv-to" onchange="syncAdvDate('to')" style="text-align:right;width:auto;min-width:130px;pointer-events:none">
+                </label>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
                 <button onclick="clearAdvFilters()" style="padding:11px;background:var(--fill);border:none;border-radius:10px;font-family:var(--font);font-size:14px;font-weight:600;color:var(--label2);cursor:pointer">Limpar</button>
@@ -1157,8 +1157,10 @@ function openAdvFilters(e){
   const hTo=document.getElementById('h-to');
   const advFrom=document.getElementById('adv-from');
   const advTo=document.getElementById('adv-to');
-  if(advFrom) advFrom.value=(hFrom?hFrom.value:'')||'';
-  if(advTo) advTo.value=(hTo?hTo.value:'')||'';
+  const today = new Date().toISOString().slice(0,10);
+  const jan1 = new Date().getFullYear() + '-01-01';
+  if(advFrom) advFrom.value=(hFrom&&hFrom.value)?hFrom.value:jan1;
+  if(advTo) advTo.value=(hTo&&hTo.value)?hTo.value:today;
   const min=window._drMin||''; const max=window._drMax||'';
   ['adv-from','adv-to'].forEach(id=>{
     const el=document.getElementById(id);
