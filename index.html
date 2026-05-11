@@ -540,11 +540,17 @@ select.fpill.active, button.fpill.active { background:var(--blue); color:#fff; }
         </div>
         <div class="ir">
           <span class="il">Plataforma</span>
-          <select class="if placeholder" id="f-casa" style="text-align:right;text-align-last:right" onchange="this.classList.toggle('placeholder',!this.value);checkForm()">
+          <select class="if placeholder" id="f-casa" style="text-align:right;text-align-last:right" onchange="this.classList.toggle('placeholder',!this.value);handlePlataformaChange('f-casa','f-nova-plat')">
             <option value="" disabled selected hidden>Selecionar</option>
-            <option>22Bet</option><option>Betclic</option>
-            <option>Betano</option><option>Café Prestígio</option><option>Outra</option>
           </select>
+        </div>
+        <div class="ir" id="f-nova-plat" style="display:none">
+          <span class="il">Nome</span>
+          <input type="text" class="if" id="f-nova-plat-input" placeholder="Nome da plataforma"
+            onkeydown="if(event.key==='Enter')confirmNovaPlataforma('f-nova-plat-input','f-casa','f-nova-plat')"
+            style="text-align:right">
+          <button onclick="confirmNovaPlataforma('f-nova-plat-input','f-casa','f-nova-plat')"
+            style="background:var(--blue);border:none;border-radius:8px;padding:6px 10px;font-family:var(--font);font-size:13px;font-weight:600;color:#fff;cursor:pointer;margin-left:6px;flex-shrink:0">OK</button>
         </div>
       </div>
 
@@ -597,11 +603,17 @@ select.fpill.active, button.fpill.active { background:var(--blue); color:#fff; }
         </div>
         <div class="ir">
           <span class="il">Plataforma</span>
-          <select class="if" id="e-casa" style="text-align:right;text-align-last:right" onchange="checkEditForm()">
+          <select class="if" id="e-casa" style="text-align:right;text-align-last:right" onchange="handlePlataformaChange('e-casa','e-nova-plat')">
             <option value="" disabled hidden>Selecionar</option>
-            <option>22Bet</option><option>Betclic</option>
-            <option>Betano</option><option>Café Prestígio</option><option>Outra</option>
           </select>
+        </div>
+        <div class="ir" id="e-nova-plat" style="display:none">
+          <span class="il">Nome</span>
+          <input type="text" class="if" id="e-nova-plat-input" placeholder="Nome da plataforma"
+            onkeydown="if(event.key==='Enter')confirmNovaPlataforma('e-nova-plat-input','e-casa','e-nova-plat')"
+            style="text-align:right">
+          <button onclick="confirmNovaPlataforma('e-nova-plat-input','e-casa','e-nova-plat')"
+            style="background:var(--blue);border:none;border-radius:8px;padding:6px 10px;font-family:var(--font);font-size:13px;font-weight:600;color:#fff;cursor:pointer;margin-left:6px;flex-shrink:0">OK</button>
         </div>
       </div>
 
@@ -1029,7 +1041,7 @@ function buildPlataformaSelects() {
     // Keep first option (placeholder or "Todas as casas")
     while(sel.options.length > 1) sel.remove(1);
     plataformas.forEach(p => sel.add(new Option(p.nome, p.nome)));
-    if(id === 'f-casa' || id === 'e-casa') sel.add(new Option('+ Nova plataforma', '__nova__'));
+    if(id === 'f-casa' || id === 'e-casa') sel.add(new Option('+ Adicionar plataforma', '__nova__'));
     if(current) sel.value = current;
   });
 }
