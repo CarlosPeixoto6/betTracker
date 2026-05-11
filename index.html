@@ -1023,26 +1023,32 @@ async function seedPlataformas() {
   await loadPlataformas();
 }
 
-async function addPlataforma(nome) {
+async function addPlataforma(nome, activeSelId) {
   const {error} = await supa.upsert('plataformas', {
     user_id: currentUser.id, nome
   }, _accessToken);
   if(error){ console.error('Add plataforma error:', error); return null; }
-  await loadPlataformas();
+  // Reload and immediately select the new platform in the active select
+  const {data} = await supa.get(
+    `/rest/v1/plataformas?user_id=eq.${currentUser.id}&order=nome.asc`,
+    _accessToken
+  );
+  plataformas = Array.isArray(data) ? data : [];
+  const selectValues = activeSelId ? {[activeSelId]: nome} : {};
+  buildPlataformaSelects(selectValues);
   return plataformas.find(p => p.nome === nome);
 }
 
-function buildPlataformaSelects() {
+function buildPlataformaSelects(selectValues) {
   const selects = ['f-casa', 'e-casa', 'h-casa'];
   selects.forEach(id => {
     const sel = document.getElementById(id);
     if(!sel) return;
-    const current = sel.value;
-    // Keep first option (placeholder or "Todas as casas")
+    const current = (selectValues && selectValues[id]) || (sel.value !== '__nova__' ? sel.value : '');
     while(sel.options.length > 1) sel.remove(1);
     plataformas.forEach(p => sel.add(new Option(p.nome, p.nome)));
     if(id === 'f-casa' || id === 'e-casa') sel.add(new Option('+ Adicionar plataforma', '__nova__'));
-    if(current) sel.value = current;
+    if(current && current !== '__nova__') sel.value = current;
   });
 }
 
@@ -1070,8 +1076,7 @@ async function confirmNovaPlataforma(inputId, selId, newFieldId) {
     input.value = '';
     return;
   }
-  await addPlataforma(nome);
-  document.getElementById(selId).value = nome;
+  await addPlataforma(nome, selId);
   document.getElementById(newFieldId).style.display = 'none';
   input.value = '';
   if(selId === 'f-casa' || selId === 'e-casa') checkForm();
