@@ -833,6 +833,36 @@ const SUPA_URL = 'https://oolqasggtevxspsjhday.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9vbHFhc2dndGV2eHNwc2poZGF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyMTA2MjgsImV4cCI6MjA5Mzc4NjYyOH0.W29UVyuZt14cf2FC19Qh-K4LDCtbKMOfN6KSOHFZLbc';
 let currentUser = null;
 let _accessToken = null;
+let _refreshToken = null;
+
+async function refreshSession() {
+  const rt = _refreshToken || localStorage.getItem('supa_refresh');
+  if(!rt) { logout(); return false; }
+  try {
+    const res = await supa.post('/auth/v1/token?grant_type=refresh_token', {refresh_token: rt});
+    if(res.access_token) {
+      _accessToken = res.access_token;
+      _refreshToken = res.refresh_token;
+      currentUser = res.user;
+      localStorage.setItem('supa_token', _accessToken);
+      localStorage.setItem('supa_refresh', _refreshToken||'');
+      localStorage.setItem('supa_user', JSON.stringify(currentUser));
+      return true;
+    }
+  } catch(e) { console.error('Refresh failed:', e); }
+  logout();
+  return false;
+}
+
+async function supaRequest(fn) {
+  let result = await fn();
+  // If empty array returned (RLS block = likely expired token), refresh and retry
+  if(Array.isArray(result.data) && result.data.length === 0 && !result.error) {
+    const refreshed = await refreshSession();
+    if(refreshed) result = await fn();
+  }
+  return result;
+}
 
 const supa = {
   headers(token, isAuth) {
@@ -960,8 +990,10 @@ async function doAuth() {
       return;
     }
     _accessToken = res.access_token;
+    _refreshToken = res.refresh_token;
     currentUser = res.user;
     localStorage.setItem('supa_token', _accessToken);
+    localStorage.setItem('supa_refresh', res.refresh_token||'');
     localStorage.setItem('supa_user', JSON.stringify(currentUser));
     showApp();
 
@@ -985,6 +1017,7 @@ async function checkSession() {
   const user  = localStorage.getItem('supa_user');
   if(token && user) {
     _accessToken = token;
+    _refreshToken = localStorage.getItem('supa_refresh')||'';
     currentUser = JSON.parse(user);
     // Verify token is still valid
     try {
@@ -1004,6 +1037,7 @@ async function logout() {
   try { await supa.post('/auth/v1/logout', {}, _accessToken); } catch(e) {}
   _accessToken = null; currentUser = null; bets = [];
   localStorage.removeItem('supa_token');
+  localStorage.removeItem('supa_refresh');
   localStorage.removeItem('supa_user');
   document.getElementById('app').style.display='none';
   document.getElementById('auth-screen').style.display='flex';
@@ -1115,12 +1149,12 @@ async function confirmNovaPlataforma(inputId, selId, newFieldId) {
 
   // Save to DB
   try {
-    const result = await supa.insert('plataformas', {
+    const result = await supaRequest(() => supa.insert('plataformas', {
       user_id: currentUser.id, nome
-    }, _accessToken);
+    }, _accessToken));
     console.log('Insert result:', JSON.stringify(result));
-    if(result.error) {
-      alert('Erro DB: ' + JSON.stringify(result.error));
+    if(result.error || (Array.isArray(result.data) && result.data.length === 0)) {
+      alert('Erro ao guardar: ' + JSON.stringify(result));
     } else {
       const {data} = await supa.get(
         `/rest/v1/plataformas?user_id=eq.${currentUser.id}&order=nome.asc`,
