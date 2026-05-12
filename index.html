@@ -1024,18 +1024,24 @@ async function seedPlataformas() {
 }
 
 async function addPlataforma(nome, activeSelId) {
+  // Add to local array immediately (optimistic update)
+  if(!plataformas.find(p => p.nome === nome)) {
+    plataformas.push({id: null, nome});
+    plataformas.sort((a,b) => a.nome.localeCompare(b.nome));
+  }
+  const selectValues = activeSelId ? {[activeSelId]: nome} : {};
+  buildPlataformaSelects(selectValues);
+  // Save to DB in background
   const {error} = await supa.upsert('plataformas', {
     user_id: currentUser.id, nome
   }, _accessToken);
   if(error){ console.error('Add plataforma error:', error); return null; }
-  // Reload and immediately select the new platform in the active select
+  // Update local array with real ID from DB
   const {data} = await supa.get(
     `/rest/v1/plataformas?user_id=eq.${currentUser.id}&order=nome.asc`,
     _accessToken
   );
-  plataformas = Array.isArray(data) ? data : [];
-  const selectValues = activeSelId ? {[activeSelId]: nome} : {};
-  buildPlataformaSelects(selectValues);
+  if(Array.isArray(data)) plataformas = data;
   return plataformas.find(p => p.nome === nome);
 }
 
@@ -1069,17 +1075,44 @@ async function confirmNovaPlataforma(inputId, selId, newFieldId) {
   const input = document.getElementById(inputId);
   const nome = input.value.trim();
   if(!nome) return;
+
   // Check duplicate
-  if(plataformas.find(p => p.nome.toLowerCase() === nome.toLowerCase())) {
-    document.getElementById(selId).value = plataformas.find(p => p.nome.toLowerCase() === nome.toLowerCase()).nome;
+  const existing = plataformas.find(p => p.nome.toLowerCase() === nome.toLowerCase());
+  if(existing) {
+    document.getElementById(selId).value = existing.nome;
     document.getElementById(newFieldId).style.display = 'none';
     input.value = '';
     return;
   }
-  await addPlataforma(nome, selId);
+
+  // Optimistic: add to all selects immediately before DB call
+  ['f-casa','e-casa','h-casa'].forEach(id => {
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    // Insert before the last option (+ Adicionar plataforma) or at end
+    const addOpt = [...sel.options].find(o => o.value === '__nova__');
+    const newOpt = new Option(nome, nome, false, id === selId);
+    if(addOpt) sel.insertBefore(newOpt, addOpt);
+    else sel.add(newOpt);
+  });
+
+  // Select immediately
+  document.getElementById(selId).value = nome;
   document.getElementById(newFieldId).style.display = 'none';
   input.value = '';
   if(selId === 'f-casa' || selId === 'e-casa') checkForm();
+
+  // Save to DB in background and update local plataformas array
+  const {error} = await supa.upsert('plataformas', {
+    user_id: currentUser.id, nome
+  }, _accessToken);
+  if(!error) {
+    const {data} = await supa.get(
+      `/rest/v1/plataformas?user_id=eq.${currentUser.id}&order=nome.asc`,
+      _accessToken
+    );
+    plataformas = Array.isArray(data) ? data : [];
+  }
 }
 
 async function loadFromDB() {
