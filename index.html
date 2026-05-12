@@ -122,7 +122,7 @@ select.if.placeholder { color:var(--label3); font-size:13px; }
 
 /* Summary card */
 .sum-card {
-  margin:8px 16px 4px; background:var(--blue); border-radius:16px; box-sizing:border-box;
+  margin:8px 16px 4px; background:var(--blue); border-radius:16px;
   padding:16px 20px; display:grid; grid-template-columns:1fr 1fr 1fr;
   position:relative; overflow:hidden;
 }
@@ -146,7 +146,7 @@ select.if.placeholder { color:var(--label3); font-size:13px; }
 .sc-s { font-size:12px; color:var(--label3); margin-top:2px; }
 
 /* Filter row */
-.frow { display:flex; gap:8px; margin:0 16px; padding:8px 0 4px; box-sizing:border-box; }
+.frow { display:flex; gap:8px; padding:8px 16px 4px; }
 .fpill {
   background:var(--bg2); border:none; border-radius:20px;
   padding:7px 10px; font-family:var(--font); font-size:14px;
@@ -161,7 +161,7 @@ select.fpill.active, button.fpill.active { background:var(--blue); color:#fff; }
 select.fpill option { font-weight:400; color:var(--label); }
 
 /* Bet item */
-.blist { margin:4px 16px; box-sizing:border-box; }
+.blist { margin:4px 16px; }
 .bi {
   background:var(--bg2); border-radius:13px; margin-bottom:8px;
   display:flex; align-items:center; gap:10px; padding:12px 14px;
@@ -289,7 +289,11 @@ select.fpill option { font-weight:400; color:var(--label); }
 
   /* Constrain all page content to max-width */
   .page { max-width:720px; margin:0 auto; padding:24px; }
-  .sum-card, .frow, .blist, .ig, .cg, .stat-grid, .seg-wrap, .month-chart, .hm-monthly-wrap { width:100%; box-sizing:border-box; }
+  /* All content elements use page padding on desktop */
+  .frow, .blist, .sum-card, .ig, .cg, .stat-grid, .seg-wrap, .month-chart, .hm-monthly-wrap {
+    margin-left:0 !important; margin-right:0 !important;
+    padding-left:0 !important; padding-right:0 !important;
+  }
 
   /* Reset element margins to rely on page padding */
   .ltitle { font-size:28px; }
@@ -302,6 +306,7 @@ select.fpill option { font-weight:400; color:var(--label); }
   .blist { padding:0; }
   .btn-primary { width:100%; margin-left:0; margin-right:0; }
   .frow { margin:0; padding:8px 0 4px; }
+  .blist { padding:0; margin:0; }
   .sum-card { margin:0 0 8px; }
   .month-chart { margin:0 0 6px; }
   .ir { padding:0 16px; }
