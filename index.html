@@ -880,6 +880,17 @@ const supa = {
     });
     return r.ok ? {error:null} : {error: await r.json()};
   },
+  async insert(table, body, token) {
+    const r = await fetch(SUPA_URL+'/rest/v1/'+table, {
+      method:'POST',
+      headers:{...this.headers(token),'Prefer':'return=representation'},
+      body:JSON.stringify(body),
+      mode:'cors', credentials:'omit'
+    });
+    const text = await r.text();
+    try { const data = JSON.parse(text); return r.ok ? {data, error:null} : {data:null, error:data}; }
+    catch(e) { return {data:null, error:text}; }
+  },
   async delete(table, params, token) {
     const r = await fetch(SUPA_URL+'/rest/v1/'+table+'?'+params, {
       method:'DELETE', headers:this.headers(token)
@@ -1016,7 +1027,7 @@ async function loadPlataformas() {
 async function seedPlataformas() {
   const defaults = ['22Bet','Betclic','Betano','Café Prestígio'];
   for(const nome of defaults) {
-    await supa.upsert('plataformas', {
+    await supa.insert('plataformas', {
       user_id: currentUser.id, nome
     }, _accessToken);
   }
@@ -1032,7 +1043,7 @@ async function addPlataforma(nome, activeSelId) {
   const selectValues = activeSelId ? {[activeSelId]: nome} : {};
   buildPlataformaSelects(selectValues);
   // Save to DB in background
-  const {error} = await supa.upsert('plataformas', {
+  const {error} = await supa.insert('plataformas', {
     user_id: currentUser.id, nome
   }, _accessToken);
   if(error){ console.error('Add plataforma error:', error); return null; }
@@ -1103,7 +1114,7 @@ async function confirmNovaPlataforma(inputId, selId, newFieldId) {
   if(selId === 'f-casa' || selId === 'e-casa') checkForm();
 
   // Save to DB in background and update local plataformas array
-  const {error} = await supa.upsert('plataformas', {
+  const {error} = await supa.insert('plataformas', {
     user_id: currentUser.id, nome
   }, _accessToken);
   if(!error) {
