@@ -52,7 +52,7 @@ html,body { height:100%; background:var(--bg); color:var(--label); font-family:v
 .tab-btn {
   flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
   padding:8px 0; background:none; border:none; color:var(--label);
-  font-family:var(--font); font-size:10px; font-weight:700;
+  font-family:var(--font); font-size:10px; font-weight:500;
   letter-spacing:0.02em; cursor:pointer; transition:color .15s;
 }
 .tab-btn.active { color:var(--label); }
@@ -122,7 +122,7 @@ select.if.placeholder { color:var(--label3); font-size:13px; }
 
 /* Summary card */
 .sum-card {
-  margin:8px 16px 4px; background:var(--blue); border-radius:16px;
+  margin:8px 16px 4px; background:var(--blue); border-radius:16px; box-sizing:border-box;
   padding:16px 20px; display:grid; grid-template-columns:1fr 1fr 1fr;
   position:relative; overflow:hidden;
 }
@@ -146,11 +146,11 @@ select.if.placeholder { color:var(--label3); font-size:13px; }
 .sc-s { font-size:12px; color:var(--label3); margin-top:2px; }
 
 /* Filter row */
-.frow { display:flex; gap:8px; padding:8px 16px 4px; box-sizing:border-box; }
+.frow { display:flex; gap:8px; margin:0 16px; padding:8px 0 4px; box-sizing:border-box; }
 .fpill {
   background:var(--bg2); border:none; border-radius:20px;
   padding:7px 10px; font-family:var(--font); font-size:14px;
-  font-weight:700; color:var(--label); cursor:pointer;
+  font-weight:500; color:var(--label); cursor:pointer;
   appearance:none; -webkit-appearance:none;
   letter-spacing:-0.2px; transition:all .15s;
   flex:1; min-width:0; text-align:center; text-align-last:center; overflow:hidden;
@@ -161,7 +161,7 @@ select.fpill.active, button.fpill.active { background:var(--blue); color:#fff; }
 select.fpill option { font-weight:400; color:var(--label); }
 
 /* Bet item */
-.blist { margin:4px 16px; }
+.blist { margin:4px 16px; box-sizing:border-box; }
 .bi {
   background:var(--bg2); border-radius:13px; margin-bottom:8px;
   display:flex; align-items:center; gap:10px; padding:12px 14px;
@@ -281,7 +281,7 @@ select.fpill option { font-weight:400; color:var(--label); }
   .tab-btn {
     flex:none; flex-direction:row; gap:12px;
     padding:12px 20px; font-size:14px; justify-content:flex-start;
-    border-radius:12px; margin:2px 8px; color:var(--label);
+    border-radius:12px; margin:2px 8px; color:var(--label); font-weight:500;
   }
   .tab-ic { width:32px; height:32px; border-radius:9px; }
   .tab-btn svg { width:20px; height:20px; }
@@ -289,6 +289,7 @@ select.fpill option { font-weight:400; color:var(--label); }
 
   /* Constrain all page content to max-width */
   .page { max-width:720px; margin:0 auto; padding:24px; }
+  .sum-card, .frow, .blist, .ig, .cg, .stat-grid, .seg-wrap, .month-chart, .hm-monthly-wrap { width:100%; box-sizing:border-box; }
 
   /* Reset element margins to rely on page padding */
   .ltitle { font-size:28px; }
@@ -300,7 +301,7 @@ select.fpill option { font-weight:400; color:var(--label); }
   .cg { margin:0 0 6px; }
   .blist { padding:0; }
   .btn-primary { width:100%; margin-left:0; margin-right:0; }
-  .frow { padding:8px 0 4px; }
+  .frow { margin:0; padding:8px 0 4px; }
   .sum-card { margin:0 0 8px; }
   .month-chart { margin:0 0 6px; }
   .ir { padding:0 16px; }
