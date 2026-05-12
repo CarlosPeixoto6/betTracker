@@ -1113,11 +1113,15 @@ async function confirmNovaPlataforma(inputId, selId, newFieldId) {
   input.value = '';
   if(selId === 'f-casa' || selId === 'e-casa') checkForm();
 
-  // Save to DB in background and update local plataformas array
-  const {error} = await supa.insert('plataformas', {
+  // Save to DB
+  const result = await supa.insert('plataformas', {
     user_id: currentUser.id, nome
   }, _accessToken);
-  if(!error) {
+  console.log('Insert plataforma result:', JSON.stringify(result));
+  if(result.error) {
+    console.error('Insert error:', JSON.stringify(result.error));
+    alert('Erro ao guardar plataforma: ' + JSON.stringify(result.error));
+  } else {
     const {data} = await supa.get(
       `/rest/v1/plataformas?user_id=eq.${currentUser.id}&order=nome.asc`,
       _accessToken
