@@ -126,10 +126,8 @@ select.if.placeholder { color:var(--label3); font-size:13px; }
   padding:16px 20px; display:grid; grid-template-columns:1fr 1fr 1fr;
   position:relative; overflow:hidden;
 }
-.sum-card::before { content:''; position:absolute; top:-30px; right:-30px;
-  width:100px; height:100px; background:rgba(255,255,255,.08); border-radius:50%; }
-.sum-card::after  { content:''; position:absolute; bottom:-20px; right:30px;
-  width:60px; height:60px; background:rgba(255,255,255,.06); border-radius:50%; }
+
+
 .si { position:relative; z-index:1; }
 .si-l { font-size:11px; font-weight:600; letter-spacing:0.04em;
   text-transform:uppercase; color:rgba(255,255,255,.7); margin-bottom:4px; }
@@ -292,8 +290,9 @@ select.fpill option { font-weight:400; color:var(--label); }
   /* All content elements use page padding on desktop */
   .frow, .blist, .sum-card, .ig, .cg, .stat-grid, .seg-wrap, .month-chart, .hm-monthly-wrap {
     margin-left:0 !important; margin-right:0 !important;
-    padding-left:0 !important; padding-right:0 !important;
   }
+  .frow { padding-left:0 !important; padding-right:0 !important; }
+  .blist { padding-left:0 !important; padding-right:0 !important; }
 
   /* Reset element margins to rely on page padding */
   .ltitle { font-size:28px; }
