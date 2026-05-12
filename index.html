@@ -834,6 +834,7 @@ const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 let currentUser = null;
 let _accessToken = null;
 let _refreshToken = null;
+let bets = [], selResult = '', pendingId = null;
 
 async function refreshSession() {
   const rt = _refreshToken || localStorage.getItem('supa_refresh');
