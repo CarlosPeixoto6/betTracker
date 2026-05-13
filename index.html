@@ -1553,10 +1553,10 @@ function goTab(n,btn){
 }
 
 function selRes(btn){
-  document.querySelectorAll('.seg').forEach(b=>b.className='seg');
+  document.querySelectorAll('#page-add .seg').forEach(b=>b.className='seg');
   selResult=btn.dataset.res;
-  const m={Win:'won',Lost:'lost'};
-  btn.classList.add(m[selResult]);
+  const m={Win:'won',Lost:'lost','Em curso':'curso'};
+  btn.classList.add(m[selResult]||'');
   autoCalc();
 }
 function checkForm(){
@@ -1602,7 +1602,9 @@ function saveBet(){
   save();buildYears();updateHdr();
   ['f-gastos','f-reembolso','f-lucro','f-notas'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-data').value=new Date().toISOString().slice(0,10);
-  document.querySelectorAll('.seg').forEach(b=>b.className='seg');
+  document.getElementById('f-casa').value='';
+  document.getElementById('f-casa').classList.add('placeholder');
+  document.querySelectorAll('#page-add .seg').forEach(b=>b.className='seg');
   selResult=''; document.getElementById('f-lucro').className='if num'; checkForm();
   const btn=document.getElementById('btn-save');
   btn.textContent='✓ Aposta Guardada!';btn.classList.add('ok');
@@ -1674,14 +1676,15 @@ function renderHistory(){
 }
 
 async function resolvebet(id, resultado) {
-  const b = bets.find(x=>x.id===id);
-  if(!b) return;
+  const idx = bets.findIndex(x=>x.id===id);
+  if(idx<0) return;
+  const b = {...bets[idx]};
   const gastos = b.gastos||0;
   const reembolso = b.reembolso||0;
-  const lucro = resultado==='Win' ? reembolso-gastos : -gastos;
   b.resultado = resultado;
-  b.lucro = lucro;
-  saveToDB(b);
+  b.lucro = resultado==='Win' ? (reembolso>0 ? reembolso-gastos : gastos) : -gastos;
+  bets[idx] = b;
+  await saveToDB(b);
   renderHistory();
   renderAnalytics();
 }
