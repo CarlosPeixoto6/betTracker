@@ -124,11 +124,13 @@ select.if.placeholder { color:var(--label3); font-size:13px; }
 .sum-card {
   margin:8px 16px 4px; background:var(--blue); border-radius:16px;
   padding:16px 20px; display:grid; grid-template-columns:1fr 1fr 1fr;
-  position:relative; overflow:hidden;
+  position:relative; overflow:hidden; transition:background .4s ease;
 }
+.sum-card.pos { background:#2d6a4f; }
+.sum-card.neg { background:#7f1d1d; }
 
 
-.si { position:relative; z-index:1; }
+.si { position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; text-align:center; }
 .si-l { font-size:11px; font-weight:600; letter-spacing:0.04em;
   text-transform:uppercase; color:rgba(255,255,255,.7); margin-bottom:4px; }
 .si-v { font-size:14px; font-weight:700; color:#fff;
@@ -1618,6 +1620,7 @@ function renderHistory(){
   const tL=fl.reduce((s,b)=>s+(b.lucro||0),0);
   const sum=document.getElementById('h-sum');
   sum.style.display=fl.length?'grid':'none';
+  sum.className='sum-card'+(tL>0?' pos':tL<0?' neg':'');
   document.getElementById('h-count').textContent=fl.length;
   document.getElementById('h-gastos').textContent=eur(tG);
   document.getElementById('h-lucro').textContent=eurS(tL);
