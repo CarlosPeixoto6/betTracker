@@ -1775,14 +1775,13 @@ function updateBet(){
     lucro:parseFloat(document.getElementById('e-lucro').value)||0,
     notas:document.getElementById('e-notas').value.trim()
   };
-  save(); buildYears(); updateHdr(); renderHistory(); renderAnalytics();
+  saveToDB(bets[idx]); buildYears(); updateHdr(); renderHistory(); renderAnalytics();
   editingId=null; editResult='';
-  goToHistory();
-}
-function goToHistory(){
+  // Navigate to history tab
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-history').classList.add('active');
-
+  document.querySelector('.tab-btn[onclick*="history"]').classList.add('active');
 }
 
 function askDel(id){pendingId=id;document.getElementById('ov').classList.add('show');}
