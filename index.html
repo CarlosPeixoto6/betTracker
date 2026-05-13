@@ -587,6 +587,7 @@ select.fpill option { font-weight:400; color:var(--label); }
         <div class="ir">
           <span class="il">Lucro / Prej.</span>
           <input type="number" class="if num" id="f-lucro" step="0.01" placeholder="0,00" oninput="styleLucro()">
+          <span id="f-lucro-curso" style="display:none;color:var(--blue);font-size:16px;font-weight:600">—</span>
         </div>
       </div>
 
@@ -1574,7 +1575,24 @@ function autoCalc(){
   const g=parseFloat(document.getElementById('f-gastos').value)||0;
   const r=parseFloat(document.getElementById('f-reembolso').value)||0;
   const l=document.getElementById('f-lucro');
-  if(selResult==='Lost') l.value=(-g).toFixed(2);
+  if(selResult==='Lost') {
+    l.value=(-g).toFixed(2);
+    l.style.display='';
+    l.placeholder='0,00';
+  } else if(selResult==='Win') {
+    l.value=r>0?(r-g).toFixed(2):'';
+    l.style.display='';
+    l.placeholder='0,00';
+  } else if(selResult==='Em curso') {
+    l.value='';
+    l.style.display='none';
+    document.getElementById('f-lucro-curso').style.display='block';
+  }
+  if(selResult!=='Em curso') {
+    const el=document.getElementById('f-lucro-curso');
+    if(el) el.style.display='none';
+    l.style.display='';
+  }
   styleLucro();
 }
 function styleLucro(){
