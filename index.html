@@ -106,7 +106,8 @@ select.if.placeholder { color:var(--label3); font-size:13px; }
 }
 .seg .seg-icon { font-size:26px; line-height:1; }
 .seg.won  { background:rgba(52,199,89,0.15); color:var(--green); }
-.seg.lost { background:rgba(255,59,48,0.15); color:var(--red); }
+.seg.lost  { background:rgba(255,59,48,0.15); color:var(--red); }
+.seg.curso { background:rgba(0,122,255,0.12); color:var(--blue); }
 .seg:active { opacity:.75; transform:scale(.97); }
 
 /* Primary button */
@@ -1593,16 +1594,23 @@ function saveBet(){
   if(isNaN(gastos)||gastos<=0) errors.push('Valor');
   if(isNaN(reembolso)) errors.push('Reembolso');
   if(errors.length){alert('Campos obrigatórios em falta:\n• '+errors.join('\n• '));return;}
-  bets.unshift({id:Date.now(),data,
-    casa:document.getElementById('f-casa').value,
-    resultado:selResult||'Win',gastos,
-    reembolso:parseFloat(document.getElementById('f-reembolso').value)||0,
-    lucro:parseFloat(document.getElementById('f-lucro').value)||0,
-    notas:document.getElementById('f-notas').value.trim()});
-  save();buildYears();updateHdr();
+  const casaNome = document.getElementById('f-casa').value;
+  const plat = plataformas.find(p => p.nome === casaNome);
+  const newBet = {
+    id: Date.now(),
+    data, casa: casaNome,
+    resultado: selResult||'Win', gastos,
+    reembolso: parseFloat(document.getElementById('f-reembolso').value)||0,
+    lucro: selResult==='Em curso' ? 0 : (parseFloat(document.getElementById('f-lucro').value)||0),
+    notas: document.getElementById('f-notas').value.trim(),
+    plataforma_id: plat ? plat.id : null
+  };
+  bets.unshift(newBet);
+  saveToDB(newBet);
+  buildYears();updateHdr();
   ['f-gastos','f-reembolso','f-lucro','f-notas'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-data').value=new Date().toISOString().slice(0,10);
-  document.getElementById('f-casa').value='';
+  buildPlataformaSelects({'f-casa':'','e-casa':document.getElementById('e-casa')?.value||''});
   document.getElementById('f-casa').classList.add('placeholder');
   document.querySelectorAll('#page-add .seg').forEach(b=>b.className='seg');
   selResult=''; document.getElementById('f-lucro').className='if num'; checkForm();
