@@ -182,6 +182,16 @@ select.fpill option { font-weight:400; color:var(--label); }
 .bbadge.lost { background:rgba(255,59,48,.12);  color:var(--red); }
 .bbadge.reimb{ background:rgba(255,149,0,.12);  color:var(--orange); }
 .bbadge.void { background:var(--fill);           color:var(--label2); }
+.bbadge.curso{ background:rgba(0,122,255,.10);   color:var(--blue); }
+.bdot.curso  { background:var(--blue); }
+.bwin-btn, .blost-btn {
+  background:none; border:none; border-radius:8px; padding:5px 7px;
+  font-size:13px; cursor:pointer; flex-shrink:0; transition:all .15s;
+}
+.bwin-btn  { color:var(--green); }
+.blost-btn { color:var(--red); }
+.bwin-btn:active  { background:rgba(52,199,89,.12); }
+.blost-btn:active { background:rgba(255,59,48,.12); }
 .bmeta { font-size:13px; color:var(--label2); white-space:nowrap;
   overflow:hidden; text-overflow:ellipsis; }
 .bright { text-align:right; flex-shrink:0; }
@@ -580,9 +590,12 @@ select.fpill option { font-weight:400; color:var(--label); }
       </div>
 
       <div class="sec-hdr">Resultado</div>
-      <div class="seg-wrap">
+      <div class="seg-wrap" style="grid-template-columns:1fr 1fr 1fr">
         <button class="seg" data-res="Win" onclick="selRes(this)">
           <span class="seg-icon">🏆</span>Win
+        </button>
+        <button class="seg" data-res="Em curso" onclick="selRes(this)">
+          <span class="seg-icon">⏳</span>Em curso
         </button>
         <button class="seg" data-res="Lost" onclick="selRes(this)">
           <span class="seg-icon">❌</span>Lost
@@ -643,9 +656,12 @@ select.fpill option { font-weight:400; color:var(--label); }
       </div>
 
       <div class="sec-hdr">Resultado</div>
-      <div class="seg-wrap">
+      <div class="seg-wrap" style="grid-template-columns:1fr 1fr 1fr">
         <button class="seg" data-res="Win" onclick="selResEdit(this)">
           <span class="seg-icon">🏆</span>Win
+        </button>
+        <button class="seg" data-res="Em curso" onclick="selResEdit(this)">
+          <span class="seg-icon">⏳</span>Em curso
         </button>
         <button class="seg" data-res="Lost" onclick="selResEdit(this)">
           <span class="seg-icon">❌</span>Lost
@@ -1220,7 +1236,7 @@ const TABS={add:'Nova Aposta',history:'Histórico',analytics:'Análise'};
 
 function eur(v){return new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(v||0);}
 function eurS(v){return(v>=0?'+':'')+eur(v);}
-function bc(r){return{Win:'won',Lost:'lost',Ganhou:'won',Perdeu:'lost'}[r]||'lost';}
+function bc(r){return{Win:'won',Lost:'lost','Em curso':'curso',Ganhou:'won',Perdeu:'lost'}[r]||'lost';}
 
 window.addEventListener('DOMContentLoaded',()=>{
   // Handle email confirmation token from URL
@@ -1639,9 +1655,13 @@ function renderHistory(){
         <div class="bmeta">${d}${b.notas?' · '+b.notas:''}</div>
       </div>
       <div class="bright">
-        <div class="blucro ${b.lucro>=0?'pos':'neg'}">${eurS(b.lucro)}</div>
+        <div class="blucro ${b.resultado==='Em curso'?'':''}${b.resultado==='Em curso'?'':b.lucro>=0?'pos':'neg'}">${b.resultado==='Em curso'?'—':eurS(b.lucro)}</div>
         <div class="bgastos">${eur(b.gastos)}</div>
       </div>
+      ${b.resultado==='Em curso'?`
+        <button class="bwin-btn" onclick="resolvebet(${b.id},'Win')" title="Win">🏆</button>
+        <button class="blost-btn" onclick="resolvebet(${b.id},'Lost')" title="Lost">❌</button>
+      `:''}
       <button class="bedit" onclick="openEdit(${b.id})">✏️</button>
       <button class="bdel" onclick="askDel(${b.id})">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -1651,6 +1671,19 @@ function renderHistory(){
       </button>
     </div>`;
   }).join('');
+}
+
+async function resolvebet(id, resultado) {
+  const b = bets.find(x=>x.id===id);
+  if(!b) return;
+  const gastos = b.gastos||0;
+  const reembolso = b.reembolso||0;
+  const lucro = resultado==='Win' ? reembolso-gastos : -gastos;
+  b.resultado = resultado;
+  b.lucro = lucro;
+  saveToDB(b);
+  renderHistory();
+  renderAnalytics();
 }
 
 let editingId=null, editResult='';
