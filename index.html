@@ -1771,8 +1771,11 @@ function checkEditForm(){
 function autoCalcEdit(){
   checkEditForm();
   const g=parseFloat(document.getElementById('e-gastos').value)||0;
+  const r=parseFloat(document.getElementById('e-reembolso').value)||0;
   const l=document.getElementById('e-lucro');
   if(editResult==='Lost') l.value=(-g).toFixed(2);
+  else if(editResult==='Win') l.value=r>0?(r-g).toFixed(2):'';
+  else if(editResult==='Em curso') l.value='0';
   styleLucroEdit();
 }
 function styleLucroEdit(){
@@ -1783,15 +1786,21 @@ function styleLucroEdit(){
 function updateBet(){
   const idx=bets.findIndex(b=>b.id===editingId);
   if(idx<0) return;
+  const gastos_e=parseFloat(document.getElementById('e-gastos').value)||0;
+  const reembolso_e=parseFloat(document.getElementById('e-reembolso').value)||0;
+  const lucro_e=editResult==='Em curso'?0:(parseFloat(document.getElementById('e-lucro').value)||0);
+  const casaNome_e=document.getElementById('e-casa').value;
+  const plat_e=plataformas.find(p=>p.nome===casaNome_e);
   bets[idx]={
-    id:editingId,
+    ...bets[idx],
     data:document.getElementById('e-data').value,
-    casa:document.getElementById('e-casa').value,
+    casa:casaNome_e,
     resultado:editResult,
-    gastos:parseFloat(document.getElementById('e-gastos').value)||0,
-    reembolso:parseFloat(document.getElementById('e-reembolso').value)||0,
-    lucro:parseFloat(document.getElementById('e-lucro').value)||0,
-    notas:document.getElementById('e-notas').value.trim()
+    gastos:gastos_e,
+    reembolso:reembolso_e,
+    lucro:lucro_e,
+    notas:document.getElementById('e-notas').value.trim(),
+    plataforma_id:plat_e?plat_e.id:bets[idx].plataforma_id
   };
   saveToDB(bets[idx]); buildYears(); updateHdr(); renderHistory(); renderAnalytics();
   editingId=null; editResult='';
