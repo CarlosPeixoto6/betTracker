@@ -1726,20 +1726,14 @@ async function resolvebet(id, resultado) {
   if(idx<0) return;
   const b = {...bets[idx]};
   const gastos = b.gastos||0;
+  const reembolso = b.reembolso||0;
 
+  b.resultado = resultado;
   if(resultado==='Win') {
-    // Ask for reembolso value
-    const input = prompt(`Aposta ganha! \nQual o valor recebido (reembolso)?\nValor apostado: ${gastos.toFixed(2)}€`, (gastos*2).toFixed(2));
-    if(input===null) return; // cancelled
-    const reembolso = parseFloat(input.replace(',','.'));
-    if(isNaN(reembolso)||reembolso<0) { alert('Valor inválido.'); return; }
-    b.reembolso = reembolso;
-    b.lucro = reembolso - gastos;
+    b.lucro = reembolso > 0 ? reembolso - gastos : gastos;
   } else {
     b.lucro = -gastos;
   }
-
-  b.resultado = resultado;
   bets[idx] = b;
   await saveToDB(b);
   renderHistory();
