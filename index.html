@@ -1628,13 +1628,32 @@ function saveBet(){
   buildYears();updateHdr();
   ['f-gastos','f-reembolso','f-lucro','f-notas'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-data').value=new Date().toISOString().slice(0,10);
-  buildPlataformaSelects({'f-casa':'','e-casa':document.getElementById('e-casa')?.value||''});
-  document.getElementById('f-casa').classList.add('placeholder');
+  buildPlataformaSelects();
+  const fcasa=document.getElementById('f-casa');
+  fcasa.selectedIndex=0;
+  fcasa.classList.add('placeholder');
   document.querySelectorAll('#page-add .seg').forEach(b=>b.className='seg');
   selResult=''; document.getElementById('f-lucro').className='if num'; checkForm();
+  // Fix: clear plataforma properly
+  document.getElementById('f-lucro-curso').style.display='none';
+  document.getElementById('f-lucro').style.display='';
+
+  // Feedback: green button then redirect to history
   const btn=document.getElementById('btn-save');
-  btn.textContent='✓ Aposta Guardada!';btn.classList.add('ok');
-  setTimeout(()=>{btn.textContent='Registar Aposta';btn.classList.remove('ok');},2000);
+  btn.textContent='✓ Registado!';
+  btn.classList.add('ok');
+  btn.disabled=true;
+  renderHistory();
+  renderAnalytics();
+  setTimeout(()=>{
+    btn.textContent='Registar Aposta';
+    btn.classList.remove('ok');
+    btn.disabled=false;
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.getElementById('page-history').classList.add('active');
+    document.querySelector('.tab-btn[onclick*="history"]').classList.add('active');
+  }, 1000);
 }
 
 function updateHdr(){
@@ -1804,11 +1823,21 @@ function updateBet(){
   };
   saveToDB(bets[idx]); buildYears(); updateHdr(); renderHistory(); renderAnalytics();
   editingId=null; editResult='';
-  // Navigate to history tab
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('page-history').classList.add('active');
-  document.querySelector('.tab-btn[onclick*="history"]').classList.add('active');
+
+  // Feedback: green button then redirect to history
+  const btnE=document.getElementById('btn-edit-save');
+  btnE.textContent='✓ Guardado!';
+  btnE.classList.add('ok');
+  btnE.disabled=true;
+  setTimeout(()=>{
+    btnE.textContent='Guardar Alterações';
+    btnE.classList.remove('ok');
+    btnE.disabled=false;
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.getElementById('page-history').classList.add('active');
+    document.querySelector('.tab-btn[onclick*="history"]').classList.add('active');
+  }, 1000);
 }
 
 function askDel(id){pendingId=id;document.getElementById('ov').classList.add('show');}
