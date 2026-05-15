@@ -161,6 +161,7 @@ select.if.placeholder { color:var(--label3); font-size:13px; }
 select.fpill.active, button.fpill.active { background:var(--blue); color:#fff; }
 select.fpill option { font-weight:400; color:var(--label) !important; }
 select.if option { font-weight:400; color:var(--label) !important; }
+select option[value="__nova__"] { color:var(--label3) !important; }
 select.fpill option[value="__nova__"],
 select.if option[value="__nova__"] { color:var(--label3) !important; }
 
@@ -525,6 +526,19 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
 </style>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-512.svg">
+<script src="https://js-de.sentry-cdn.com/b7dd31dbd575ac19e1a9d29f7a89ee4d.min.js" crossorigin="anonymous"></script>
+<script>
+  if(typeof Sentry !== 'undefined') Sentry.init({
+    dsn: "https://b7dd31dbd575ac19e1a9d29f7a89ee4d@o4511394012594176.ingest.de.sentry.io/4511394034876501",
+    environment: location.hostname === 'bettracker.pt' ? 'production' : 'development',
+    tracesSampleRate: 1.0,
+    beforeSend(event) {
+      // Don't send events in development
+      if(location.hostname === 'localhost' || location.protocol === 'file:') return null;
+      return event;
+    }
+  });
+</script>
 </head>
 <body>
 <div id="auth-screen">
