@@ -1222,18 +1222,24 @@ async function loadFromDB() {
 }
 
 async function saveToDB(bet) {
-  // If bet has a temp id (from Date.now), insert and get DB-generated id
+  // Generate a safe unique bigint id: timestamp(ms) * 1000 + random 3 digits
+  // This avoids collisions while staying within JS safe integer range
+  const id = bet.id && !String(bet.id).startsWith('temp_')
+    ? bet.id
+    : (Date.now() * 1000 + Math.floor(Math.random() * 999));
+
   const payload = {
+    id,
     user_id: currentUser.id,
     data: bet.data, casa: bet.casa, resultado: bet.resultado,
     gastos: bet.gastos, reembolso: bet.reembolso, lucro: bet.lucro, notas: bet.notas||'',
     plataforma_id: bet.plataforma_id || null
   };
-  if(bet._dbId) payload.id = bet._dbId; // use DB id for updates
 
   const {data, error} = await supa.insert('apostas', payload, _accessToken);
   if(error) { console.error('Save error:', error); return null; }
-  return Array.isArray(data) && data[0] ? data[0] : null;
+  const saved = Array.isArray(data) ? data[0] : data;
+  return saved || {id};
 }
 
 async function updateInDB(bet) {
