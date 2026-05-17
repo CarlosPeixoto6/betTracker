@@ -1198,7 +1198,6 @@ async function confirmNovaPlataforma(inputId, selId, newFieldId) {
     const result = await supaRequest(() => supa.insert('plataformas', {
       user_id: currentUser.id, nome
     }, _accessToken));
-    console.log('Insert result:', JSON.stringify(result));
     if(result.error || (Array.isArray(result.data) && result.data.length === 0)) {
       alert('Erro ao guardar: ' + JSON.stringify(result));
     } else {
@@ -1223,17 +1222,36 @@ async function loadFromDB() {
 }
 
 async function saveToDB(bet) {
+  // If bet has a temp id (from Date.now), insert and get DB-generated id
+  const payload = {
+    user_id: currentUser.id,
+    data: bet.data, casa: bet.casa, resultado: bet.resultado,
+    gastos: bet.gastos, reembolso: bet.reembolso, lucro: bet.lucro, notas: bet.notas||'',
+    plataforma_id: bet.plataforma_id || null
+  };
+  if(bet._dbId) payload.id = bet._dbId; // use DB id for updates
+
+  const {data, error} = await supa.insert('apostas', payload, _accessToken);
+  if(error) { console.error('Save error:', error); return null; }
+  return Array.isArray(data) && data[0] ? data[0] : null;
+}
+
+async function updateInDB(bet) {
   const {error} = await supa.upsert('apostas', {
-    id: bet.id, user_id: currentUser.id,
+    id: bet._dbId || bet.id,
+    user_id: currentUser.id,
     data: bet.data, casa: bet.casa, resultado: bet.resultado,
     gastos: bet.gastos, reembolso: bet.reembolso, lucro: bet.lucro, notas: bet.notas||'',
     plataforma_id: bet.plataforma_id || null
   }, _accessToken);
-  if(error) console.error('Save error:', error);
+  if(error) console.error('Update error:', error);
 }
 
 async function deleteFromDB(id) {
-  const {error} = await supa.delete('apostas', `id=eq.${id}&user_id=eq.${currentUser.id}`, _accessToken);
+  // id could be temp (Date.now) - find real DB id
+  const bet = bets.find(b => b.id === id);
+  const dbId = bet?._dbId || id;
+  const {error} = await supa.delete('apostas', `id=eq.${dbId}&user_id=eq.${currentUser.id}`, _accessToken);
   if(error) console.error('Delete error:', error);
 }
 
@@ -1246,17 +1264,37 @@ function iconErr1(img,d){img.src='https://www.google.com/s2/favicons?domain='+d+
 function iconErr2(img){var p=img.parentNode;img.remove();p.textContent='🎲';p.style.fontSize='20px';}
 const ICON_DIRECT={'22Bet':'https://www.22bet21.com/favicon.ico'};
 function casaIcon(c){
-  if(ICON_EMOJIS[c]) return '<div class="c-icon" style="background:transparent">'+ICON_EMOJIS[c]+'</div>';
+  if(ICON_EMOJIS[c]) return '<div class="c-icon" style="background:transparent">'+esc(ICON_EMOJIS[c])+'</div>';
   const d=ICON_DOMAINS[c];
   if(!d) return '<div class="c-icon">🎲</div>';
-  const primary=ICON_DIRECT[c]||('https://logo.clearbit.com/'+d);
-  return '<div class="c-icon" style="background:transparent"><img src="'+primary+'" onerror="iconErr1(this,\''+d+'\')" style="width:36px;height:36px;border-radius:10px;object-fit:cover"></div>';
+  const primary=ICON_DIRECT[c]||('https://logo.clearbit.com/'+encodeURIComponent(d));
+  return '<div class="c-icon" style="background:transparent"><img src="'+esc(primary)+'" onerror="iconErr1(this,\''+esc(d)+'\')" style="width:36px;height:36px;border-radius:10px;object-fit:cover" alt="'+esc(c)+'"></div>';
 }
 const TABS={add:'Nova Aposta',history:'Histórico',analytics:'Análise'};
 
 function eur(v){return new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(v||0);}
 function eurS(v){return(v>=0?'+':'')+eur(v);}
 function bc(r){return{Win:'won',Lost:'lost','Em curso':'curso',Ganhou:'won',Perdeu:'lost'}[r]||'lost';}
+
+// ── XSS protection - escape all user data before HTML insertion ──
+function esc(str) {
+  if(str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+function esc(str){ // XSS-safe HTML escape
+  if(!str) return '';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#039;');
+}
 
 window.addEventListener('DOMContentLoaded',()=>{
   // Handle email confirmation token from URL
@@ -1632,8 +1670,9 @@ function saveBet(){
   if(errors.length){alert('Campos obrigatórios em falta:\n• '+errors.join('\n• '));return;}
   const casaNome = document.getElementById('f-casa').value;
   const plat = plataformas.find(p => p.nome === casaNome);
+  const tempId = Date.now(); // temporary local id
   const newBet = {
-    id: Date.now(),
+    id: tempId,
     data, casa: casaNome,
     resultado: selResult||'Win', gastos,
     reembolso: parseFloat(document.getElementById('f-reembolso').value)||0,
@@ -1642,8 +1681,14 @@ function saveBet(){
     plataforma_id: plat ? plat.id : null
   };
   bets.unshift(newBet);
-  saveToDB(newBet);
   buildYears();updateHdr();
+  // Save to DB and update with real DB id
+  saveToDB(newBet).then(saved => {
+    if(saved && saved.id) {
+      const idx = bets.findIndex(b => b.id === tempId);
+      if(idx >= 0) { bets[idx]._dbId = saved.id; bets[idx].id = saved.id; }
+    }
+  });
   ['f-gastos','f-reembolso','f-lucro','f-notas'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-data').value=new Date().toISOString().slice(0,10);
   buildPlataformaSelects();
@@ -1713,23 +1758,24 @@ function renderHistory(){
   list.innerHTML=fl.map(b=>{
     const d=new Date(b.data).toLocaleDateString('pt-PT',{day:'2-digit',month:'short'});
     const c=bc(b.resultado);
+    const sid=esc(String(b.id));
     return `<div class="bi">
       <div class="bdot ${c}"></div>
       <div class="bbody">
-        <div class="btop"><span class="bcasa">${b.casa}</span><span class="bbadge ${c}">${b.resultado}</span></div>
-        <div class="bmeta">${d}${b.notas?' · '+b.notas:''}</div>
+        <div class="btop"><span class="bcasa">${esc(b.casa)}</span><span class="bbadge ${c}">${esc(b.resultado)}</span></div>
+        <div class="bmeta">${esc(d)}${b.notas?' · '+esc(b.notas):''}</div>
       </div>
       <div class="bright">
         <div class="blucro ${b.resultado==='Em curso'?'curso':b.lucro>=0?'pos':'neg'}">${b.resultado==='Em curso'?'—':eurS(b.lucro)}</div>
         <div class="bgastos">${eur(b.gastos)}</div>
       </div>
       ${b.resultado==='Em curso'?`
-        <button class="bwin-btn" onclick="resolvebet(${b.id},'Win')" title="Win">🏆</button>
-        <button class="blost-btn" onclick="resolvebet(${b.id},'Lost')" title="Lost">❌</button>
+        <button class="bwin-btn" onclick="resolvebet('${sid}','Win')" title="Marcar Win" aria-label="Marcar como Win">🏆</button>
+        <button class="blost-btn" onclick="resolvebet('${sid}','Lost')" title="Marcar Lost" aria-label="Marcar como Lost">❌</button>
       `:''}
-      <button class="bedit" onclick="openEdit(${b.id})">✏️</button>
-      <button class="bdel" onclick="askDel(${b.id})">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <button class="bedit" onclick="openEdit('${sid}')" aria-label="Editar aposta">✏️</button>
+      <button class="bdel" onclick="askDel('${sid}')" aria-label="Apagar aposta">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
           <polyline points="3 6 5 6 21 6"/>
           <path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2"/>
         </svg>
@@ -1739,7 +1785,7 @@ function renderHistory(){
 }
 
 async function resolvebet(id, resultado) {
-  const idx = bets.findIndex(x=>x.id===id);
+  const idx = bets.findIndex(x=>String(x.id)===String(id));
   if(idx<0) return;
   const b = {...bets[idx]};
   const gastos = b.gastos||0;
@@ -1752,7 +1798,7 @@ async function resolvebet(id, resultado) {
     b.lucro = -gastos;
   }
   bets[idx] = b;
-  await saveToDB(b);
+  await updateInDB(b);
   renderHistory();
   renderAnalytics();
 }
@@ -1760,7 +1806,7 @@ async function resolvebet(id, resultado) {
 let editingId=null, editResult='';
 
 function openEdit(id){
-  const b=bets.find(x=>x.id===id);
+  const b=bets.find(x=>String(x.id)===String(id));
   if(!b) return;
   editingId=id;
   editResult=b.resultado;
@@ -1833,7 +1879,7 @@ function updateBet(){
     notas:document.getElementById('e-notas').value.trim(),
     plataforma_id:plat_e?plat_e.id:bets[idx].plataforma_id
   };
-  saveToDB(bets[idx]); buildYears(); updateHdr(); renderHistory(); renderAnalytics();
+  updateInDB(bets[idx]); buildYears(); updateHdr(); renderHistory(); renderAnalytics();
   editingId=null; editResult='';
 
   // Feedback: green button then redirect to history
@@ -1852,11 +1898,11 @@ function updateBet(){
   }, 1000);
 }
 
-function askDel(id){pendingId=id;document.getElementById('ov').classList.add('show');}
+function askDel(id){pendingId=String(id);document.getElementById('ov').classList.add('show');}
 function cancelDel(){document.getElementById('ov').classList.remove('show');pendingId=null;}
 function confirmDel(){
   const delId=pendingId;
-  bets=bets.filter(b=>b.id!==delId);
+  bets=bets.filter(b=>String(b.id)!==String(delId));
   deleteFromDB(delId); buildYears(); updateHdr();renderHistory();renderAnalytics();
   cancelDel();
 }
@@ -1885,7 +1931,7 @@ function renderAnalytics(){
   document.getElementById('a-casas').innerHTML=cas.length
     ?cas.map(([c,v])=>`<div class="cr">
       ${casaIcon(c)}
-      <div class="c-meta"><div class="c-name">${c}</div>
+      <div class="c-meta"><div class="c-name">${esc(c)}</div>
       <div class="c-sub">${v.n} apostas · ${eur(v.g)}</div></div>
       <div class="c-val ${v.l>=0?'pos':'neg'}">${eurS(v.l)}</div>
     </div>`).join('')
