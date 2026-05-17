@@ -1222,8 +1222,7 @@ async function loadFromDB() {
 }
 
 async function saveToDB(bet) {
-  // Generate a safe unique bigint id: timestamp(ms) * 1000 + random 3 digits
-  // This avoids collisions while staying within JS safe integer range
+  // Generate unique ID: timestamp * 1000 + random to avoid collisions
   const id = bet.id && !String(bet.id).startsWith('temp_')
     ? bet.id
     : (Date.now() * 1000 + Math.floor(Math.random() * 999));
@@ -1236,15 +1235,14 @@ async function saveToDB(bet) {
     plataforma_id: bet.plataforma_id || null
   };
 
-  const {data, error} = await supa.insert('apostas', payload, _accessToken);
+  const {error} = await supa.upsert('apostas', payload, _accessToken);
   if(error) { console.error('Save error:', error); return null; }
-  const saved = Array.isArray(data) ? data[0] : data;
-  return saved || {id};
+  return {id};
 }
 
 async function updateInDB(bet) {
   const {error} = await supa.upsert('apostas', {
-    id: bet._dbId || bet.id,
+    id: bet.id,
     user_id: currentUser.id,
     data: bet.data, casa: bet.casa, resultado: bet.resultado,
     gastos: bet.gastos, reembolso: bet.reembolso, lucro: bet.lucro, notas: bet.notas||'',
@@ -1254,10 +1252,7 @@ async function updateInDB(bet) {
 }
 
 async function deleteFromDB(id) {
-  // id could be temp (Date.now) - find real DB id
-  const bet = bets.find(b => b.id === id);
-  const dbId = bet?._dbId || id;
-  const {error} = await supa.delete('apostas', `id=eq.${dbId}&user_id=eq.${currentUser.id}`, _accessToken);
+  const {error} = await supa.delete('apostas', `id=eq.${id}&user_id=eq.${currentUser.id}`, _accessToken);
   if(error) console.error('Delete error:', error);
 }
 
