@@ -1833,17 +1833,19 @@ function openEdit(id){
 function selResEdit(btn){
   document.querySelectorAll('#page-edit .seg').forEach(b=>b.className='seg');
   editResult=btn.dataset.res;
-  btn.classList.add(editResult==='Win'?'won':'lost');
+  const m={Win:'won',Lost:'lost','Em curso':'curso'};
+  btn.classList.add(m[editResult]||'');
   autoCalcEdit();
   checkEditForm();
 }
 function checkEditForm(){
+  const reembolso = document.getElementById('e-reembolso').value;
   const ok=
     document.getElementById('e-data').value &&
     document.getElementById('e-casa').value &&
     editResult &&
     parseFloat(document.getElementById('e-gastos').value)>0 &&
-    document.getElementById('e-reembolso').value!=='';
+    (editResult==='Em curso' || editResult==='Lost' || reembolso!=='');
   document.getElementById('btn-edit-save').disabled=!ok;
 }
 function autoCalcEdit(){
