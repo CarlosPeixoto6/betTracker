@@ -1241,14 +1241,24 @@ async function saveToDB(bet) {
 }
 
 async function updateInDB(bet) {
-  const {error} = await supa.upsert('apostas', {
-    id: bet.id,
+  const id = bet.id;
+  const payload = {
+    id,
     user_id: currentUser.id,
     data: bet.data, casa: bet.casa, resultado: bet.resultado,
-    gastos: bet.gastos, reembolso: bet.reembolso, lucro: bet.lucro, notas: bet.notas||'',
+    gastos: bet.gastos, reembolso: bet.reembolso||0, lucro: bet.lucro||0,
+    notas: bet.notas||'',
     plataforma_id: bet.plataforma_id || null
-  }, _accessToken);
-  if(error) console.error('Update error:', error);
+  };
+  const r = await fetch(SUPA_URL+'/rest/v1/apostas?id=eq.'+id+'&user_id=eq.'+currentUser.id, {
+    method: 'PATCH',
+    headers: {...supa.headers(_accessToken), 'Prefer': 'return=representation'},
+    body: JSON.stringify(payload),
+    mode: 'cors', credentials: 'omit'
+  });
+  const text = await r.text();
+  if(!r.ok) console.error('Update error:', text);
+  else console.log('Update OK:', text);
 }
 
 async function deleteFromDB(id) {
@@ -1821,7 +1831,10 @@ function openEdit(id){
   // set result buttons
   document.querySelectorAll('#page-edit .seg').forEach(btn=>{
     btn.className='seg';
-    if(btn.dataset.res===b.resultado) btn.classList.add(b.resultado==='Win'?'won':'lost');
+    if(btn.dataset.res===b.resultado){
+      const m={Win:'won',Lost:'lost','Em curso':'curso'};
+      btn.classList.add(m[b.resultado]||'');
+    }
   });
   styleLucroEdit();
   checkEditForm();
@@ -1864,11 +1877,13 @@ function styleLucroEdit(){
   l.className='if num'+(v>0?' pos':v<0?' neg':'');
 }
 function updateBet(){
-  const idx=bets.findIndex(b=>b.id===editingId);
+  const idx=bets.findIndex(b=>String(b.id)===String(editingId));
   if(idx<0) return;
   const gastos_e=parseFloat(document.getElementById('e-gastos').value)||0;
   const reembolso_e=parseFloat(document.getElementById('e-reembolso').value)||0;
-  const lucro_e=editResult==='Em curso'?0:(parseFloat(document.getElementById('e-lucro').value)||0);
+  const lucro_e=editResult==='Em curso'?0:
+    editResult==='Lost'?(-gastos_e):
+    (parseFloat(document.getElementById('e-lucro').value)||0);
   const casaNome_e=document.getElementById('e-casa').value;
   const plat_e=plataformas.find(p=>p.nome===casaNome_e);
   bets[idx]={
