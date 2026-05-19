@@ -1668,7 +1668,7 @@ function styleLucro(){
   l.className='if num'+(v>0?' pos':v<0?' neg':'');
 }
 
-function saveBet(){
+async function saveBet(){
   const data=document.getElementById('f-data').value;
   const gastos=parseFloat(document.getElementById('f-gastos').value);
   const reembolso=parseFloat(document.getElementById('f-reembolso').value);
@@ -1691,15 +1691,13 @@ function saveBet(){
     notas: document.getElementById('f-notas').value.trim(),
     plataforma_id: plat ? plat.id : null
   };
+  // Save to DB first, get real id back
+  const saved = await saveToDB(newBet);
+  if(saved && saved.id) {
+    newBet.id = saved.id;
+  }
   bets.unshift(newBet);
-  buildYears();updateHdr();
-  // Save to DB and update with real DB id
-  saveToDB(newBet).then(saved => {
-    if(saved && saved.id) {
-      const idx = bets.findIndex(b => b.id === tempId);
-      if(idx >= 0) { bets[idx]._dbId = saved.id; bets[idx].id = saved.id; }
-    }
-  });
+  buildYears(); updateHdr();
   ['f-gastos','f-reembolso','f-lucro','f-notas'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-data').value=new Date().toISOString().slice(0,10);
   buildPlataformaSelects();
