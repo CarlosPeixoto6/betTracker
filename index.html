@@ -523,6 +523,17 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
 .auth-btn:disabled { opacity:.5; cursor:not-allowed; }
 .auth-err { font-size:13px; color:var(--red); text-align:center; margin-top:10px; min-height:18px; }
 .auth-loading { font-size:14px; color:var(--label2); text-align:center; margin-top:10px; }
+
+.toast {
+  position:fixed; bottom:calc(var(--safe-bot) + 80px); left:50%;
+  transform:translateX(-50%); background:#1c1c1e; color:#fff;
+  padding:10px 20px; border-radius:12px; font-size:14px; font-weight:500;
+  z-index:9999; opacity:0; transition:opacity .3s;
+  max-width:calc(100% - 48px); text-align:center;
+}
+.toast.show { opacity:1; }
+.toast.error { background:#c0392b; }
+.toast.success { background:#27ae60; }
 </style>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-512.svg">
@@ -902,8 +913,8 @@ async function refreshSession() {
 
 async function supaRequest(fn) {
   let result = await fn();
-  // If empty array returned (RLS block = likely expired token), refresh and retry
-  if(Array.isArray(result.data) && result.data.length === 0 && !result.error) {
+  // Only refresh on explicit 401 Unauthorized, not on empty arrays
+  if(result.status === 401 || (result.error && result.error.code === 'PGRST301')) {
     const refreshed = await refreshSession();
     if(refreshed) result = await fn();
   }
@@ -1214,11 +1225,22 @@ async function confirmNovaPlataforma(inputId, selId, newFieldId) {
 }
 
 async function loadFromDB() {
-  const {data} = await supa.get(
-    `/rest/v1/apostas?user_id=eq.${currentUser.id}&order=data.desc`,
-    _accessToken
-  );
-  return Array.isArray(data) ? data : [];
+  try {
+    const {data} = await supa.get(
+      `/rest/v1/apostas?user_id=eq.${currentUser.id}&order=data.desc`,
+      _accessToken
+    );
+    if(!Array.isArray(data)) {
+      console.error('loadFromDB: resposta inesperada:', data);
+      showToast('Erro ao carregar apostas. Recarrega a página.', 'error');
+      return [];
+    }
+    return data;
+  } catch(e) {
+    console.error('loadFromDB exception:', e);
+    showToast('Sem ligação à base de dados.', 'error');
+    return [];
+  }
 }
 
 async function saveToDB(bet) {
@@ -1375,6 +1397,15 @@ async function init(){
   updateHdr(); buildYears(); renderHistory(); renderAnalytics();
 }
 
+
+function showToast(msg, type='success', duration=2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type;
+  void t.offsetWidth;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
 function renderHeatmapOnly(){
   const ano = document.getElementById('hm-ano')?.value||'';
   renderHeatmap(bets, ano);
@@ -1421,12 +1452,14 @@ function openAdvFilters(e){
   });
   popover.classList.add('open');
   document.getElementById('adv-btn').classList.add('active');
-  setTimeout(()=>document.addEventListener('click', _closeOnOutside), 0);
+  setTimeout(()=>document.addEventListener('click', _closeOnOutside, {once:true}), 0);
 }
 function _closeOnOutside(e){
   const pop=document.getElementById('adv-popover');
   if(pop && !pop.contains(e.target) && e.target.id!=='adv-btn'){
     closeAdvFilters();
+  } else if(pop && pop.classList.contains('open')){
+    setTimeout(()=>document.addEventListener('click', _closeOnOutside, {once:true}), 0);
   }
 }
 function syncAdvDate(field){
@@ -1447,8 +1480,8 @@ function updateAdvDisplays(){
 function closeAdvFilters(){
   const pop=document.getElementById('adv-popover');
   if(pop) pop.classList.remove('open');
-  document.getElementById('adv-btn').classList.remove('active');
-  document.removeEventListener('click', _closeOnOutside);
+  const btn=document.getElementById('adv-btn');
+  if(btn) btn.classList.remove('active');
 }
 function clearAdvFilters(){
   closeAdvFilters();
