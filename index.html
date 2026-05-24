@@ -622,13 +622,13 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
 
       <div class="sec-hdr">Resultado</div>
       <div class="seg-wrap" style="grid-template-columns:1fr 1fr 1fr">
-        <button class="seg" data-res="Win" onclick="selRes(this)">
+        <button class="seg" data-res="Win" onclick="selRes(this)" aria-pressed="false">
           <span class="seg-icon">🏆</span>Win
         </button>
-        <button class="seg" data-res="Em curso" onclick="selRes(this)">
+        <button class="seg" data-res="Em curso" onclick="selRes(this)" aria-pressed="false">
           <span class="seg-icon">⏳</span>Em curso
         </button>
-        <button class="seg" data-res="Lost" onclick="selRes(this)">
+        <button class="seg" data-res="Lost" onclick="selRes(this)" aria-pressed="false">
           <span class="seg-icon">❌</span>Lost
         </button>
       </div>
@@ -688,13 +688,13 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
 
       <div class="sec-hdr">Resultado</div>
       <div class="seg-wrap" style="grid-template-columns:1fr 1fr 1fr">
-        <button class="seg" data-res="Win" onclick="selResEdit(this)">
+        <button class="seg" data-res="Win" onclick="selResEdit(this)" aria-pressed="false">
           <span class="seg-icon">🏆</span>Win
         </button>
-        <button class="seg" data-res="Em curso" onclick="selResEdit(this)">
+        <button class="seg" data-res="Em curso" onclick="selResEdit(this)" aria-pressed="false">
           <span class="seg-icon">⏳</span>Em curso
         </button>
-        <button class="seg" data-res="Lost" onclick="selResEdit(this)">
+        <button class="seg" data-res="Lost" onclick="selResEdit(this)" aria-pressed="false">
           <span class="seg-icon">❌</span>Lost
         </button>
       </div>
@@ -1655,10 +1655,11 @@ function goTab(n,btn){
 }
 
 function selRes(btn){
-  document.querySelectorAll('#page-add .seg').forEach(b=>b.className='seg');
+  document.querySelectorAll('#page-add .seg').forEach(b=>{b.className='seg'; b.setAttribute('aria-pressed','false');});
   selResult=btn.dataset.res;
   const m={Win:'won',Lost:'lost','Em curso':'curso'};
   btn.classList.add(m[selResult]||'');
+  btn.setAttribute('aria-pressed','true');
   autoCalc();
 }
 function checkForm(){
@@ -1862,9 +1863,11 @@ function openEdit(id){
   // set result buttons
   document.querySelectorAll('#page-edit .seg').forEach(btn=>{
     btn.className='seg';
+    btn.setAttribute('aria-pressed','false');
     if(btn.dataset.res===b.resultado){
       const m={Win:'won',Lost:'lost','Em curso':'curso'};
       btn.classList.add(m[b.resultado]||'');
+      btn.setAttribute('aria-pressed','true');
     }
   });
   styleLucroEdit();
