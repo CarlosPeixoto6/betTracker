@@ -1227,7 +1227,7 @@ async function confirmNovaPlataforma(inputId, selId, newFieldId) {
 async function loadFromDB() {
   try {
     const {data} = await supa.get(
-      `/rest/v1/apostas?user_id=eq.${currentUser.id}&order=data.desc`,
+      `/rest/v1/apostas?user_id=eq.${currentUser.id}&order=data.desc&limit=10000`,
       _accessToken
     );
     if(!Array.isArray(data)) {
