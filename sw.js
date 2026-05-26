@@ -1,19 +1,26 @@
-const CACHE_NAME = 'bettracker-v1';
-const ASSETS = [
+const CACHE_NAME = 'bettracker-v2';
+const SHELL_ASSETS = [
   './index.html',
   './manifest.json',
-  'https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap'
 ];
 
-// Install: cache all assets
+// Domains that must NEVER be cached
+const BYPASS_CACHE = [
+  'supabase.co',
+  'sentry-cdn.com',
+  'fonts.googleapis.com',
+  'fonts.gstatic.com',
+  'clearbit.com',
+  'google.com',
+];
+
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL_ASSETS))
   );
   self.skipWaiting();
 });
 
-// Activate: delete old caches
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
@@ -23,20 +30,27 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
-// Fetch: serve from cache, fall back to network
 self.addEventListener('fetch', e => {
+  const url = new URL(e.request.url);
+
+  // Always bypass cache for API calls and external resources
+  const shouldBypass = BYPASS_CACHE.some(domain => url.hostname.includes(domain));
+  if (shouldBypass || e.request.method !== 'GET') {
+    e.respondWith(fetch(e.request));
+    return;
+  }
+
+  // App shell: cache-first, fall back to network
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
       return fetch(e.request).then(response => {
-        // Cache successful GET requests
-        if (e.request.method === 'GET' && response.status === 200) {
+        if (response.status === 200) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
         }
         return response;
       }).catch(() => {
-        // Offline fallback for navigation requests
         if (e.request.mode === 'navigate') {
           return caches.match('./index.html');
         }
@@ -44,4 +58,3 @@ self.addEventListener('fetch', e => {
     })
   );
 });
-
