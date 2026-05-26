@@ -945,19 +945,27 @@ const supa = {
     try { return JSON.parse(text); } 
     catch(e) { return {error: text, status: r.status}; }
   },
-  async get(path, token) {
+ async get(path, token) {
     const isAuth = path.startsWith('/auth/');
+    // Build headers conditionally: Prefer only for PostgREST, never for auth
+    const h = {
+      ...this.headers(token, isAuth),
+      'Cache-Control': 'no-cache, no-store',
+      'Pragma': 'no-cache'
+    };
+    if(!isAuth) h['Prefer'] = 'count=exact';
     const r = await fetch(SUPA_URL+path, {
       method:'GET',
-      headers:{...this.headers(token, isAuth),'Prefer':'count=exact'},
+      headers: h,
       mode:'cors',
-      credentials:'omit'
+      credentials:'omit',
+      cache: 'no-store' // Bypass browser HTTP cache entirely
     });
     const text = await r.text();
     let data;
     try { data = JSON.parse(text); } catch(e) { data = []; }
     const count = parseInt(r.headers.get('content-range')?.split('/')[1])||0;
-    return {data, count};
+    return {data, count, status: r.status}; // expose status for supaRequest
   },
   async upsert(table, body, token) {
     const r = await fetch(SUPA_URL+'/rest/v1/'+table, {
@@ -1105,11 +1113,12 @@ async function logout() {
 let plataformas = []; // [{id, nome}]
 
 async function loadPlataformas() {
-  const {data} = await supa.get(
+  // supaRequest handles token expiry with automatic refresh
+  const result = await supaRequest(() => supa.get(
     `/rest/v1/plataformas?user_id=eq.${currentUser.id}&order=nome.asc`,
     _accessToken
-  );
-  plataformas = Array.isArray(data) ? data : [];
+  ));
+  plataformas = Array.isArray(result.data) ? result.data : [];
   // Seed default platforms if none exist
   if(plataformas.length === 0) await seedPlataformas();
   else buildPlataformaSelects();
@@ -1226,16 +1235,17 @@ async function confirmNovaPlataforma(inputId, selId, newFieldId) {
 
 async function loadFromDB() {
   try {
-    const {data} = await supa.get(
-      `/rest/v1/apostas?user_id=eq.${currentUser.id}&order=data.desc&limit=10000`,
+    // supaRequest handles token expiry with automatic refresh
+    const result = await supaRequest(() => supa.get(
+      `/rest/v1/apostas?user_id=eq.${currentUser.id}&order=data.desc,id.desc&limit=10000`,
       _accessToken
-    );
-    if(!Array.isArray(data)) {
-      console.error('loadFromDB: resposta inesperada:', data);
+    ));
+    if(!Array.isArray(result.data)) {
+      console.error('loadFromDB: resposta inesperada:', result.data);
       showToast('Erro ao carregar apostas. Recarrega a página.', 'error');
       return [];
     }
-    return data;
+    return result.data;
   } catch(e) {
     console.error('loadFromDB exception:', e);
     showToast('Sem ligação à base de dados.', 'error');
