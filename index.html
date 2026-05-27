@@ -429,6 +429,16 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
   .date-range-row { padding:4px 24px 8px; }
 }
 
+/* ── iOS Safari only: empurra os date inputs para a direita na flex row.
+   @supports (-webkit-touch-callout) só faz match em iOS Safari —
+   desktop Chrome, Firefox e Safari macOS não são afetados. ── */
+@supports (-webkit-touch-callout: none) {
+  #f-data,
+  #e-data {
+    margin-left: auto;
+  }
+}
+
 /* ── Custom Date Picker ── */
 .dr-display { font-size:14px; color:var(--label); font-weight:500; }
 .cal-overlay {
