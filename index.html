@@ -429,17 +429,6 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
   .date-range-row { padding:4px 24px 8px; }
 }
 
-/* ── iOS Safari only: empurra os date inputs para a direita na flex row.
-   @supports (-webkit-touch-callout) só faz match em iOS Safari —
-   desktop Chrome, Firefox e Safari macOS não são afetados. ── */
-@supports (-webkit-touch-callout: none) {
-  #f-data,
-  #e-data {
-    flex: none;        /* cancela o flex:1 da classe .if */
-    margin-left: auto; /* agora tem espaço para empurrar à direita */
-  }
-}
-
 /* ── Custom Date Picker ── */
 .dr-display { font-size:14px; color:var(--label); font-weight:500; }
 .cal-overlay {
@@ -594,11 +583,11 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
 
       <div class="sec-hdr">Detalhes</div>
       <div class="ig">
-        <div class="ir">
+        <div class="ir" style="cursor:pointer" onclick="openPickerFor('f-data')">
           <span class="il">Data</span>
-          <input type="date" class="if" id="f-data" style="text-align:right;min-width:130px" onchange="checkForm()">
+          <input type="date" id="f-data" style="display:none" onchange="checkForm()">
+          <span id="f-data-display" class="if" style="color:var(--label3)">Selecionar</span>
         </div>
-        <div class="ir">
           <span class="il">Plataforma</span>
           <select class="if placeholder" id="f-casa" style="text-align:right;text-align-last:right" onchange="this.classList.toggle('placeholder',!this.value);handlePlataformaChange('f-casa','f-nova-plat')">
             <option value="" disabled selected hidden>Selecionar</option>
@@ -661,11 +650,11 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
 
       <div class="sec-hdr">Detalhes</div>
       <div class="ig">
-        <div class="ir">
+        <div class="ir" style="cursor:pointer" onclick="openPickerFor('e-data')">
           <span class="il">Data</span>
-          <input type="date" class="if" id="e-data" style="text-align:right;min-width:130px" onchange="checkEditForm()">
+          <input type="date" id="e-data" style="display:none" onchange="checkEditForm()">
+          <span id="e-data-display" class="if" style="color:var(--label3)">Selecionar</span>
         </div>
-        <div class="ir">
           <span class="il">Plataforma</span>
           <select class="if" id="e-casa" style="text-align:right;text-align-last:right" onchange="handlePlataformaChange('e-casa','e-nova-plat')">
             <option value="" disabled hidden>Selecionar</option>
@@ -1408,6 +1397,8 @@ function extractFromHash(hash, key) {
 async function init(){
   // Show loading state
   document.getElementById('f-data').value=new Date().toISOString().slice(0,10);
+  updateDateDisplay('f-data');
+  buildPlataformaSelects();
   
   // Migrate historical data if first login
   
@@ -1451,6 +1442,39 @@ function setDateRangeLimits(){
 }
 /* ── Custom Date Picker Logic ── */
 let _calField='from', _calYear=new Date().getFullYear(), _calMonth=new Date().getMonth(), _calSel='';
+// Null = modo filtros histórico; string = id do input de formulário
+let _calTargetId = null;
+
+/** Abre o cal-overlay para qualquer date input de formulário */
+function openPickerFor(inputId) {
+  _calTargetId = inputId;
+  const input = document.getElementById(inputId);
+  const val = input ? input.value : '';
+  _calSel = val || '';
+  const ref = val ? new Date(val + 'T12:00:00') : new Date();
+  _calYear = ref.getFullYear();
+  _calMonth = ref.getMonth();
+  showDayGrid();
+  buildYMSelects();
+  updateConfirmBtn();
+  renderCalendar();
+  document.getElementById('cal-overlay').style.display = 'flex';
+}
+
+/** Sincroniza o span de display com o valor do input escondido */
+function updateDateDisplay(inputId) {
+  const input = document.getElementById(inputId);
+  const display = document.getElementById(inputId + '-display');
+  if(!input || !display) return;
+  if(input.value) {
+    display.textContent = new Date(input.value + 'T12:00:00').toLocaleDateString('pt-PT');
+    display.style.color = 'var(--label)';
+  } else {
+    display.textContent = 'Selecionar';
+    display.style.color = 'var(--label3)';
+  }
+} 
+  
 const MNAMES_PT=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 function openAdvFilters(e){
@@ -1538,6 +1562,7 @@ function validateDateRange(field){
   renderHistory();
 }
 function openPicker(field){
+  _calTargetId = null; // garante modo filtros histórico
   _calField=field;
   const val=document.getElementById('h-'+field).value;
   _calSel=val||'';
@@ -1549,7 +1574,10 @@ function openPicker(field){
   renderCalendar();
   document.getElementById('cal-overlay').style.display='flex';
 }
-function closePicker(){ document.getElementById('cal-overlay').style.display='none'; }
+function closePicker(){
+  _calTargetId = null;
+  document.getElementById('cal-overlay').style.display='none';
+}
 function showDayGrid(){
   document.getElementById('cal-ym').style.display='none';
   document.getElementById('cal-days-wrap').style.display='block';
@@ -1595,7 +1623,18 @@ function calShift(d){
 
 function confirmPicker(){
   if(!_calSel) return;
-  setPickerDate(_calField, _calSel);
+  if(_calTargetId) {
+    // Modo formulário: atualiza input escondido e span de display
+    const input = document.getElementById(_calTargetId);
+    if(input) {
+      input.value = _calSel;
+      input.dispatchEvent(new Event('change'));
+    }
+    updateDateDisplay(_calTargetId);
+  } else {
+    // Modo histórico: comportamento existente intocado
+    setPickerDate(_calField, _calSel);
+  }
   closePicker();
 }
 
@@ -1755,6 +1794,7 @@ async function saveBet(){
   buildYears(); updateHdr();
   ['f-gastos','f-reembolso','f-lucro','f-notas'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-data').value=new Date().toISOString().slice(0,10);
+  updateDateDisplay('f-data');
   buildPlataformaSelects();
   const fcasa=document.getElementById('f-casa');
   fcasa.selectedIndex=0;
@@ -1875,6 +1915,7 @@ function openEdit(id){
   editingId=id;
   editResult=b.resultado;
   document.getElementById('e-data').value=b.data;
+  updateDateDisplay('e-data');
   const casaSel=document.getElementById('e-casa');
   casaSel.value=b.casa;
   document.getElementById('e-gastos').value=b.gastos;
