@@ -12,6 +12,10 @@ const BYPASS_CACHE = [
   'fonts.gstatic.com',
   'clearbit.com',
   'google.com',
+  '22bet21.com',
+  'betclic.pt',
+  'betano.com',
+  'solverde.pt',
 ];
 
 self.addEventListener('install', e => {
