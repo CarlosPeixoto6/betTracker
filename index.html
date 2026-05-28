@@ -537,6 +537,8 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
 .toast.success { background:#27ae60; }
 </style>
 <link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-512.svg">
 <link rel="apple-touch-icon" href="icon-512.svg">
 <script src="https://js-de.sentry-cdn.com/b7dd31dbd575ac19e1a9d29f7a89ee4d.min.js" crossorigin="anonymous"></script>
 <script>
@@ -1470,11 +1472,11 @@ async function deleteFromDB(id) {
 
 const MONTHS=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const COLORS={'22Bet':'#FF9500','Betclic':'#007AFF','Betano':'#FF3B30','Café Prestígio':'#34C759','Outra':'#5856D6'};
-const ICON_DOMAINS={'22Bet':'22bet21.com','Betclic':'betclic.pt','Betano':'betano.com'};
+const ICON_DOMAINS={'22Bet':'22bet.com','Betclic':'betclic.pt','Betano':'betano.com','Solverde':'solverde.pt'};
 const ICON_EMOJIS={'Café Prestígio':'☕','Outra':'🎲'};
 function iconErr1(img,d){img.src='https://www.google.com/s2/favicons?domain='+d+'&sz=64';img.onerror=function(){iconErr2(img);};}
 function iconErr2(img){var p=img.parentNode;img.remove();p.textContent='🎲';p.style.fontSize='20px';}
-const ICON_DIRECT={'22Bet':'https://www.22bet21.com/favicon.ico'};
+const ICON_DIRECT={};
 function casaIcon(c){
   if(ICON_EMOJIS[c]) return '<div class="c-icon" style="background:transparent">'+esc(ICON_EMOJIS[c])+'</div>';
   const d=ICON_DOMAINS[c];
