@@ -435,7 +435,8 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
 @supports (-webkit-touch-callout: none) {
   #f-data,
   #e-data {
-    margin-left: auto;
+    flex: none;        /* cancela o flex:1 da classe .if */
+    margin-left: auto; /* agora tem espaço para empurrar à direita */
   }
 }
 
