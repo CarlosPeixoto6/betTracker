@@ -588,6 +588,7 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
           <input type="date" id="f-data" style="display:none" onchange="checkForm()">
           <span id="f-data-display" class="if" style="color:var(--label3)">Selecionar</span>
         </div>
+          <div class="ir">
           <span class="il">Plataforma</span>
           <select class="if placeholder" id="f-casa" style="text-align:right;text-align-last:right" onchange="this.classList.toggle('placeholder',!this.value);handlePlataformaChange('f-casa','f-nova-plat')">
             <option value="" disabled selected hidden>Selecionar</option>
@@ -655,6 +656,7 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
           <input type="date" id="e-data" style="display:none" onchange="checkEditForm()">
           <span id="e-data-display" class="if" style="color:var(--label3)">Selecionar</span>
         </div>
+          <div class="ir">
           <span class="il">Plataforma</span>
           <select class="if" id="e-casa" style="text-align:right;text-align-last:right" onchange="handlePlataformaChange('e-casa','e-nova-plat')">
             <option value="" disabled hidden>Selecionar</option>
