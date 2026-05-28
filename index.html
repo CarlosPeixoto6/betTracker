@@ -1110,6 +1110,172 @@ async function logout() {
   document.getElementById('auth-screen').style.display='flex';
 }
 
+  // ── Módulo de Logout Automático por Inatividade ───────────────────────────
+/**
+ * InactivityTimer
+ * Monitoriza a atividade do utilizador e faz logout automático
+ * após um período de inatividade configurável via base de dados.
+ *
+ * Suporta sincronização entre múltiplos separadores via BroadcastChannel.
+ *
+ * Uso:
+ *   await InactivityTimer.loadConfig()  — lê timeout da BD
+ *   InactivityTimer.start()             — inicia monitorização
+ *   InactivityTimer.stop()              — para e limpa tudo
+ */
+const InactivityTimer = (() => {
+  // ── Constantes ──────────────────────────────────────────────
+  const DEFAULT_MINUTES    = 5;
+  const THROTTLE_MS        = 500;   // throttle de mousemove
+  const CHANNEL_NAME       = 'bettracker_session';
+  const ACTIVITY_EVENTS    = ['mousemove', 'click', 'keydown', 'scroll', 'touchstart'];
+
+  // ── Estado interno ───────────────────────────────────────────
+  let _timer           = null;
+  let _timeoutMs       = DEFAULT_MINUTES * 60 * 1000;
+  let _channel         = null;
+  let _throttlePending = false;
+  let _active          = false;
+
+  // ── Carregamento de configuração ─────────────────────────────
+  /**
+   * Lê o valor de 'session_timeout_minutes' na tabela configuracoes.
+   * Em caso de erro ou ausência de registo, aplica o valor por defeito.
+   */
+  async function loadConfig() {
+    try {
+      const result = await supa.get(
+        `/rest/v1/configuracoes?chave=eq.session_timeout_minutes&select=valor`,
+        _accessToken
+      );
+      if (Array.isArray(result.data) && result.data.length > 0) {
+        const minutes = parseInt(result.data[0].valor, 10);
+        if (!isNaN(minutes) && minutes > 0) {
+          _timeoutMs = minutes * 60 * 1000;
+          console.log(`[InactivityTimer] Timeout configurado: ${minutes} min`);
+          return;
+        }
+      }
+      console.log(`[InactivityTimer] Config não encontrada. Default: ${DEFAULT_MINUTES} min`);
+    } catch (e) {
+      console.warn('[InactivityTimer] Erro ao carregar config:', e);
+    }
+  }
+
+  // ── Gestão do timer ──────────────────────────────────────────
+  /**
+   * Reinicia o temporizador de inatividade.
+   * Chamado sempre que o utilizador interage com a página.
+   */
+  function reset() {
+    if (!_active) return;
+    if (_timer) clearTimeout(_timer);
+    _timer = setTimeout(_handleTimeout, _timeoutMs);
+  }
+
+  /**
+   * Versão throttled de reset para eventos de alta frequência (mousemove).
+   * Evita chamadas excessivas ao clearTimeout/setTimeout.
+   */
+  function _throttledReset() {
+    if (_throttlePending) return;
+    _throttlePending = true;
+    setTimeout(() => { _throttlePending = false; reset(); }, THROTTLE_MS);
+  }
+
+  // ── Expiração de sessão ──────────────────────────────────────
+  /**
+   * Executado quando o timer expira.
+   * Notifica outros separadores e efetua o logout.
+   */
+  async function _handleTimeout() {
+    console.log('[InactivityTimer] Sessão expirada por inatividade.');
+    _broadcastLogout();
+    await _doLogout();
+  }
+
+  /**
+   * Envia sinal de logout para outros separadores abertos.
+   */
+  function _broadcastLogout() {
+    try {
+      if (_channel) _channel.postMessage({ type: 'inactivity_logout' });
+    } catch (e) {
+      console.warn('[InactivityTimer] Erro no BroadcastChannel:', e);
+    }
+  }
+
+  /**
+   * Executa o logout e apresenta feedback ao utilizador.
+   */
+  async function _doLogout() {
+    stop();
+    await logout();
+    // Pequeno delay para garantir que o DOM do login está visível antes do toast
+    setTimeout(() => showToast('Sessão terminada por inatividade.', 'error', 4000), 100);
+  }
+
+  // ── Ciclo de vida ────────────────────────────────────────────
+  /**
+   * Inicia a monitorização de inatividade.
+   * Regista listeners de atividade e configura sincronização entre separadores.
+   */
+  function start() {
+    stop(); // garantir estado limpo antes de iniciar
+    _active = true;
+
+    // Sincronização entre separadores via BroadcastChannel
+    if ('BroadcastChannel' in window) {
+      try {
+        _channel = new BroadcastChannel(CHANNEL_NAME);
+        _channel.onmessage = (e) => {
+          if (e.data?.type === 'inactivity_logout') {
+            console.log('[InactivityTimer] Logout recebido de outro separador.');
+            _doLogout();
+          }
+        };
+      } catch (e) {
+        console.warn('[InactivityTimer] BroadcastChannel não disponível:', e);
+      }
+    }
+
+    // Registar listeners — mousemove usa versão throttled
+    ACTIVITY_EVENTS.forEach(evt => {
+      const handler = evt === 'mousemove' ? _throttledReset : reset;
+      window.addEventListener(evt, handler, { passive: true });
+    });
+
+    reset(); // arrancar o primeiro timer
+    console.log(`[InactivityTimer] Iniciado. Timeout: ${_timeoutMs / 60000} min`);
+  }
+
+  /**
+   * Para o timer, remove todos os listeners e fecha o BroadcastChannel.
+   * Seguro para chamar múltiplas vezes (idempotente).
+   */
+  function stop() {
+    _active = false;
+    _throttlePending = false;
+
+    if (_timer) { clearTimeout(_timer); _timer = null; }
+
+    ACTIVITY_EVENTS.forEach(evt => {
+      const handler = evt === 'mousemove' ? _throttledReset : reset;
+      window.removeEventListener(evt, handler);
+    });
+
+    if (_channel) {
+      try { _channel.close(); } catch (e) {}
+      _channel = null;
+    }
+
+    console.log('[InactivityTimer] Parado e limpo.');
+  }
+
+  // API pública
+  return { loadConfig, start, stop };
+})();
+
 // ── DB operations ─────────────────────────────
 // ── Plataformas ───────────────────────────────
 let plataformas = []; // [{id, nome}]
@@ -1409,6 +1575,10 @@ async function init(){
   bets = await loadFromDB();
   
   updateHdr(); buildYears(); renderHistory(); renderAnalytics();
+
+  // Carregar timeout da BD e arrancar monitorização de inatividade
+  await InactivityTimer.loadConfig();
+  InactivityTimer.start();
 }
 
 
@@ -2188,6 +2358,8 @@ function renderHeatmap(fl, ano){
 <!-- Advanced filters popover (hidden inputs keep filter state) -->
 <input type="hidden" id="h-from">
 <input type="hidden" id="h-to">
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script>
 // Service Worker only on HTTPS (not local files)
