@@ -85,6 +85,12 @@ html,body { height:100%; background:var(--bg); color:var(--label); font-family:v
   height:0.5px; background:var(--sep); }
 .il { font-size:14px; letter-spacing:-0.4px; color:var(--label);
   min-width:95px; flex-shrink:0; padding:13px 0; }
+
+/* [A] Garante que <label class="il"> herda o cursor do pai (.ir),
+   evitando que o browser aplique o cursor padrão de label (pointer)
+   em contextos onde não é desejado (ex: data oculta). */
+label.il { cursor: inherit; }
+
 .if {
   flex:1; border:none; outline:none; background:transparent;
   font-family:var(--font); font-size:14px; letter-spacing:-0.4px;
@@ -564,11 +570,13 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
       <button class="auth-tab" onclick="switchAuthTab('register')">Registar</button>
     </div>
     <div class="auth-field">
-      <label class="auth-label">Email</label>
+      <!-- [A] Adicionado for="auth-email" para associar label ao input -->
+      <label class="auth-label" for="auth-email">Email</label>
       <input type="email" id="auth-email" class="auth-input" placeholder="o-teu@email.com" autocomplete="email" onkeydown="if(event.key==='Enter')document.getElementById('auth-pass').focus()">
     </div>
     <div class="auth-field">
-      <label class="auth-label">Password</label>
+      <!-- [A] Adicionado for="auth-pass" para associar label ao input -->
+      <label class="auth-label" for="auth-pass">Password</label>
       <input type="password" id="auth-pass" class="auth-input" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doAuth()">
     </div>
     <button class="auth-btn" id="auth-btn" onclick="doAuth()">Entrar</button>
@@ -587,18 +595,21 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
       <div class="sec-hdr">Detalhes</div>
       <div class="ig">
         <div class="ir" style="cursor:pointer" onclick="openPickerFor('f-data')">
-          <span class="il">Data</span>
+          <!-- [A] span → label com for="f-data" -->
+          <label class="il" for="f-data">Data</label>
           <input type="date" id="f-data" style="display:none" onchange="checkForm()">
           <span id="f-data-display" class="if" style="color:var(--label3)">Selecionar</span>
         </div>
-          <div class="ir">
-          <span class="il">Plataforma</span>
+        <div class="ir">
+          <!-- [A] span → label com for="f-casa" -->
+          <label class="il" for="f-casa">Plataforma</label>
           <select class="if placeholder" id="f-casa" style="text-align:right;text-align-last:right" onchange="this.classList.toggle('placeholder',!this.value);handlePlataformaChange('f-casa','f-nova-plat')">
             <option value="" disabled selected hidden>Selecionar</option>
           </select>
         </div>
         <div class="ir" id="f-nova-plat" style="display:none">
-          <span class="il">Nome</span>
+          <!-- [A] span → label com for="f-nova-plat-input" -->
+          <label class="il" for="f-nova-plat-input">Nome</label>
           <input type="text" class="if" id="f-nova-plat-input" placeholder="Nome da plataforma"
             onkeydown="if(event.key==='Enter')confirmNovaPlataforma('f-nova-plat-input','f-casa','f-nova-plat')"
             style="text-align:right">
@@ -610,15 +621,18 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
       <div class="sec-hdr">Valores</div>
       <div class="ig">
         <div class="ir">
-          <span class="il">Gastos (€)</span>
+          <!-- [A] span → label com for="f-gastos" -->
+          <label class="il" for="f-gastos">Gastos (€)</label>
           <input type="number" class="if num" id="f-gastos" step="0.01" min="0" placeholder="0,00" oninput="autoCalc()">
         </div>
         <div class="ir">
-          <span class="il">Reembolso (€)</span>
+          <!-- [A] span → label com for="f-reembolso" -->
+          <label class="il" for="f-reembolso">Reembolso (€)</label>
           <input type="number" class="if num" id="f-reembolso" step="0.01" min="0" placeholder="0,00" oninput="autoCalc()">
         </div>
         <div class="ir">
-          <span class="il">Lucro / Prej.</span>
+          <!-- [A] span → label com for="f-lucro" -->
+          <label class="il" for="f-lucro">Lucro / Prej.</label>
           <input type="number" class="if num" id="f-lucro" step="0.01" placeholder="0,00" oninput="styleLucro()">
           <span id="f-lucro-curso" style="display:none;color:var(--blue);font-size:16px;font-weight:600;margin-left:auto;text-align:right">—</span>
         </div>
@@ -640,7 +654,8 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
       <div class="sec-hdr">Notas</div>
       <div class="ig">
         <div class="ir">
-          <input type="text" class="if" id="f-notas" placeholder="Ex: Futebol, Liga Portugal…" style="text-align:left">
+          <!-- [A] Campo sem label visual — adicionado aria-label para leitores de ecrã -->
+          <input type="text" class="if" id="f-notas" placeholder="Ex: Futebol, Liga Portugal…" style="text-align:left" aria-label="Notas">
         </div>
       </div>
 
@@ -655,18 +670,21 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
       <div class="sec-hdr">Detalhes</div>
       <div class="ig">
         <div class="ir" style="cursor:pointer" onclick="openPickerFor('e-data')">
-          <span class="il">Data</span>
+          <!-- [A] span → label com for="e-data" -->
+          <label class="il" for="e-data">Data</label>
           <input type="date" id="e-data" style="display:none" onchange="checkEditForm()">
           <span id="e-data-display" class="if" style="color:var(--label3)">Selecionar</span>
         </div>
-          <div class="ir">
-          <span class="il">Plataforma</span>
+        <div class="ir">
+          <!-- [A] span → label com for="e-casa" -->
+          <label class="il" for="e-casa">Plataforma</label>
           <select class="if" id="e-casa" style="text-align:right;text-align-last:right" onchange="handlePlataformaChange('e-casa','e-nova-plat')">
             <option value="" disabled hidden>Selecionar</option>
           </select>
         </div>
         <div class="ir" id="e-nova-plat" style="display:none">
-          <span class="il">Nome</span>
+          <!-- [A] span → label com for="e-nova-plat-input" -->
+          <label class="il" for="e-nova-plat-input">Nome</label>
           <input type="text" class="if" id="e-nova-plat-input" placeholder="Nome da plataforma"
             onkeydown="if(event.key==='Enter')confirmNovaPlataforma('e-nova-plat-input','e-casa','e-nova-plat')"
             style="text-align:right">
@@ -678,15 +696,18 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
       <div class="sec-hdr">Valores</div>
       <div class="ig">
         <div class="ir">
-          <span class="il">Gastos (€)</span>
+          <!-- [A] span → label com for="e-gastos" -->
+          <label class="il" for="e-gastos">Gastos (€)</label>
           <input type="number" class="if num" id="e-gastos" step="0.01" min="0" placeholder="0,00" oninput="autoCalcEdit()">
         </div>
         <div class="ir">
-          <span class="il">Reembolso (€)</span>
+          <!-- [A] span → label com for="e-reembolso" -->
+          <label class="il" for="e-reembolso">Reembolso (€)</label>
           <input type="number" class="if num" id="e-reembolso" step="0.01" min="0" placeholder="0,00" oninput="autoCalcEdit()">
         </div>
         <div class="ir">
-          <span class="il">Lucro / Prej.</span>
+          <!-- [A] span → label com for="e-lucro" -->
+          <label class="il" for="e-lucro">Lucro / Prej.</label>
           <input type="number" class="if num" id="e-lucro" step="0.01" placeholder="0,00" oninput="styleLucroEdit()">
         </div>
       </div>
@@ -707,7 +728,8 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
       <div class="sec-hdr">Notas</div>
       <div class="ig">
         <div class="ir">
-          <input type="text" class="if" id="e-notas" placeholder="Ex: Futebol, Liga Portugal…" style="text-align:left">
+          <!-- [A] Campo sem label visual — adicionado aria-label para leitores de ecrã -->
+          <input type="text" class="if" id="e-notas" placeholder="Ex: Futebol, Liga Portugal…" style="text-align:left" aria-label="Notas">
         </div>
       </div>
 
@@ -724,13 +746,15 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
 
       <!-- Plataforma -->
       <div class="frow" style="padding-bottom:0">
-        <select class="fpill" id="h-casa" onchange="renderHistory()">
+        <!-- [B] Adicionado aria-label ao select de plataforma do histórico -->
+        <select class="fpill" id="h-casa" aria-label="Filtrar por plataforma" onchange="renderHistory()">
           <option value="">Plataforma</option>
         </select>
       </div>
 
       <div class="frow" style="padding-bottom:4px">
-        <select class="fpill" id="h-mes" onchange="renderHistory()">
+        <!-- [B] Adicionado aria-label ao select de mês -->
+        <select class="fpill" id="h-mes" aria-label="Filtrar por mês" onchange="renderHistory()">
           <option value="">Mês</option>
           <option value="0">Janeiro</option><option value="1">Fevereiro</option>
           <option value="2">Março</option><option value="3">Abril</option>
@@ -739,7 +763,8 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
           <option value="8">Setembro</option><option value="9">Outubro</option>
           <option value="10">Novembro</option><option value="11">Dezembro</option>
         </select>
-        <select class="fpill" id="h-ano" onchange="renderHistory()">
+        <!-- [B] Adicionado aria-label ao select de ano do histórico -->
+        <select class="fpill" id="h-ano" aria-label="Filtrar por ano" onchange="renderHistory()">
           <option value="">Ano</option>
         </select>
         <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:0">
@@ -785,7 +810,8 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
       <div class="ltitle-wrap" style="display:flex;align-items:center;justify-content:space-between"><div class="ltitle">Análise</div><button onclick="logout()" style="background:var(--fill);border:none;border-radius:10px;padding:8px 12px;font-family:var(--font);font-size:12px;font-weight:600;color:var(--label2);cursor:pointer">Sair</button></div>
 
       <div class="frow">
-        <select class="fpill" id="a-ano" onchange="renderAnalytics()">
+        <!-- [B] Adicionado aria-label ao select de ano da análise -->
+        <select class="fpill" id="a-ano" aria-label="Filtrar por ano" onchange="renderAnalytics()">
           <option value="">Todos os anos</option>
         </select>
       </div>
@@ -818,7 +844,8 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
 
       <div class="sec-hdr" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px">
         <span>Atividade — Lucro/Prejuízo por Mês</span>
-        <select id="hm-ano" onchange="renderHeatmapOnly()" style="background:var(--fill);border:none;border-radius:8px;padding:4px 8px;font-family:var(--font);font-size:12px;font-weight:600;color:var(--label2);cursor:pointer;appearance:none;-webkit-appearance:none">
+        <!-- [B] Adicionado aria-label ao select do heatmap -->
+        <select id="hm-ano" aria-label="Filtrar atividade por ano" onchange="renderHeatmapOnly()" style="background:var(--fill);border:none;border-radius:8px;padding:4px 8px;font-family:var(--font);font-size:12px;font-weight:600;color:var(--label2);cursor:pointer;appearance:none;-webkit-appearance:none">
           <option value="">Todos</option>
         </select>
       </div>
@@ -2373,3 +2400,4 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
   });
 }
 </script>
+</document_content>
