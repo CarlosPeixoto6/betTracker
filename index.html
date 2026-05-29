@@ -1096,6 +1096,9 @@ async function doAuth() {
     localStorage.setItem('supa_token', _accessToken);
     localStorage.setItem('supa_refresh', res.refresh_token||'');
     localStorage.setItem('supa_user', JSON.stringify(currentUser));
+    if(typeof Sentry !== 'undefined') Sentry.addBreadcrumb({
+      category: 'auth', message: 'Login com sucesso', level: 'info'
+    });
     showApp();
 
   } catch(e) {
@@ -1110,6 +1113,10 @@ async function doAuth() {
 function showApp() {
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app').style.display='flex';
+  // Identificar o utilizador no Sentry para rastrear erros por utilizador
+  if(typeof Sentry !== 'undefined') {
+    Sentry.setUser({ id: currentUser.id, email: currentUser.email });
+  }
   init();
 }
 
@@ -1140,6 +1147,8 @@ async function logout() {
   localStorage.removeItem('supa_token');
   localStorage.removeItem('supa_refresh');
   localStorage.removeItem('supa_user');
+  // Limpar utilizador do Sentry ao fazer logout
+  if(typeof Sentry !== 'undefined') Sentry.setUser(null);
   document.getElementById('app').style.display='none';
   document.getElementById('auth-screen').style.display='flex';
 }
@@ -1596,6 +1605,9 @@ function extractFromHash(hash, key) {
 }
 
 async function init(){
+  if(typeof Sentry !== 'undefined') Sentry.addBreadcrumb({
+    category: 'app', message: 'init: aplicação iniciada', level: 'info'
+  });
   // Show loading state
   document.getElementById('f-data').value=new Date().toISOString().slice(0,10);
   updateDateDisplay('f-data');
@@ -1968,6 +1980,10 @@ function styleLucro(){
 }
 
 async function saveBet(){
+  if(typeof Sentry !== 'undefined') Sentry.addBreadcrumb({
+    category: 'bet', message: 'saveBet iniciado', level: 'info',
+    data: { casa: document.getElementById('f-casa').value, resultado: selResult }
+  });
   const data=document.getElementById('f-data').value;
   const gastos=parseFloat(document.getElementById('f-gastos').value);
   const reembolso=parseFloat(document.getElementById('f-reembolso').value);
@@ -2094,6 +2110,10 @@ function renderHistory(){
 }
 
 async function resolvebet(id, resultado) {
+  if(typeof Sentry !== 'undefined') Sentry.addBreadcrumb({
+    category: 'bet', message: `resolvebet: ${resultado}`, level: 'info',
+    data: { id, resultado }
+  });
   const idx = bets.findIndex(x=>String(x.id)===String(id));
   if(idx<0) return;
   const b = {...bets[idx]};
@@ -2178,6 +2198,10 @@ function styleLucroEdit(){
   l.className='if num'+(v>0?' pos':v<0?' neg':'');
 }
 function updateBet(){
+  if(typeof Sentry !== 'undefined') Sentry.addBreadcrumb({
+    category: 'bet', message: 'updateBet iniciado', level: 'info',
+    data: { id: editingId, resultado: editResult }
+  });
   const idx=bets.findIndex(b=>String(b.id)===String(editingId));
   if(idx<0) return;
   const gastos_e=parseFloat(document.getElementById('e-gastos').value)||0;
@@ -2221,6 +2245,10 @@ function askDel(id){pendingId=String(id);document.getElementById('ov').classList
 function cancelDel(){document.getElementById('ov').classList.remove('show');pendingId=null;}
 function confirmDel(){
   const delId=pendingId;
+  if(typeof Sentry !== 'undefined') Sentry.addBreadcrumb({
+    category: 'bet', message: 'confirmDel: aposta eliminada', level: 'info',
+    data: { id: delId }
+  });
   bets=bets.filter(b=>String(b.id)!==String(delId));
   deleteFromDB(delId); buildYears(); updateHdr();renderHistory();renderAnalytics();
   cancelDel();
