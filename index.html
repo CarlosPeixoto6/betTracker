@@ -1121,13 +1121,28 @@ function showApp() {
 }
 
 async function checkSession() {
-  const token = localStorage.getItem('supa_token');
-  const user  = localStorage.getItem('supa_user');
-  if(token && user) {
-    _accessToken = token;
-    _refreshToken = localStorage.getItem('supa_refresh')||'';
-    currentUser = JSON.parse(user);
-    // Verify token is still valid
+  const token       = localStorage.getItem('supa_token');
+  const refreshToken= localStorage.getItem('supa_refresh');
+  const userStr     = localStorage.getItem('supa_user');
+
+  if(!userStr) return; // nada guardado — mostra ecrã de autenticação
+
+  _accessToken  = token || '';
+  _refreshToken = refreshToken || '';
+  currentUser   = JSON.parse(userStr);
+
+  // Renova sempre o access token na inicialização.
+  // O access token expira em ~1h; o refresh token dura 7 dias.
+  // Renovar aqui garante que as chamadas à BD nunca recebem 401.
+  if(refreshToken) {
+    const ok = await refreshSession();
+    if(ok) { showApp(); return; }
+    // refreshSession() chama logout() internamente se falhar
+    return;
+  }
+
+  // Sem refresh token: verifica o access token diretamente
+  if(token) {
     try {
       const res = await supa.get('/auth/v1/user', token);
       if(res.data && res.data.id) {
@@ -1136,9 +1151,12 @@ async function checkSession() {
         return;
       }
     } catch(e) {}
-    localStorage.removeItem('supa_token');
-    localStorage.removeItem('supa_user');
   }
+
+  // Tudo falhou: limpa storage
+  localStorage.removeItem('supa_token');
+  localStorage.removeItem('supa_refresh');
+  localStorage.removeItem('supa_user');
 }
 
 async function logout() {
