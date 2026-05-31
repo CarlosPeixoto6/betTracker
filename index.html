@@ -1112,9 +1112,13 @@ async function doAuth() {
 function showApp() {
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app').style.display='flex';
-  // Identificar o utilizador no Sentry — guarda defensiva contra SDK ainda não inicializado
-  if(typeof Sentry !== 'undefined' && typeof Sentry.setUser === 'function') {
-    Sentry.setUser({ id: currentUser.id, email: currentUser.email });
+  // Identificar o utilizador no Sentry — try/catch defensivo para SDK lazy init
+  try {
+    if(typeof Sentry !== 'undefined') {
+      Sentry.setUser({ id: currentUser.id, email: currentUser.email });
+    }
+  } catch(e) {
+    console.warn('[Sentry] setUser falhou (SDK ainda não inicializado):', e.message);
   }
   init();
 }
@@ -1165,7 +1169,11 @@ async function logout() {
   localStorage.removeItem('supa_refresh');
   localStorage.removeItem('supa_user');
   // Limpar utilizador do Sentry ao fazer logout
-  if(typeof Sentry !== 'undefined' && typeof Sentry.setUser === 'function') Sentry.setUser(null);
+  try {
+  if(typeof Sentry !== 'undefined') Sentry.setUser(null);
+} catch(e) {
+  console.warn('[Sentry] setUser(null) falhou:', e.message);
+}
   document.getElementById('app').style.display='none';
   document.getElementById('auth-screen').style.display='flex';
 }
