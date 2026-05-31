@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bettracker-v2';
+const CACHE_NAME = 'bettracker-v3';
 const SHELL_ASSETS = [
   './index.html',
   './manifest.json',
