@@ -2465,6 +2465,17 @@ async function saveBet(){
   }
   bets.unshift(newBet);
 
+  // Upload de imagem — guarda blob localmente antes de limpar o estado
+  const _addBlob = _imgState.add.pendingBlob;
+  _imgState.add = { pendingBlob: null, existingUrl: null, pendingRemove: false };
+  clearImgUI('add');
+  if (_addBlob) {
+    // Substitui temporariamente o blob para commitImageUpload o encontrar
+    _imgState.add.pendingBlob = _addBlob;
+    await commitImageUpload('add', newBet.id);
+    _imgState.add.pendingBlob = null;
+  }
+
   // Upload de imagem assíncrono — não bloqueia o registo da aposta
   if (_imgState.add.pendingBlob) {
     commitImageUpload('add', newBet.id);
