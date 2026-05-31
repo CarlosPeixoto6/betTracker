@@ -2465,16 +2465,12 @@ async function saveBet(){
   }
   bets.unshift(newBet);
 
-  // Upload de imagem — guarda blob localmente antes de limpar o estado
-  const _addBlob = _imgState.add.pendingBlob;
+   // Upload de imagem: executa antes de limpar UI, com o betId real confirmado
+  if (_imgState.add.pendingBlob) {
+    await commitImageUpload('add', newBet.id);
+  }
   _imgState.add = { pendingBlob: null, existingUrl: null, pendingRemove: false };
   clearImgUI('add');
-  if (_addBlob) {
-    // Substitui temporariamente o blob para commitImageUpload o encontrar
-    _imgState.add.pendingBlob = _addBlob;
-    await commitImageUpload('add', newBet.id);
-    _imgState.add.pendingBlob = null;
-  }
 
   buildYears(); updateHdr();
   ['f-gastos','f-reembolso','f-lucro','f-notas'].forEach(id=>document.getElementById(id).value='');
