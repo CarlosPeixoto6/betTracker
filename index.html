@@ -1096,7 +1096,7 @@ async function doAuth() {
     localStorage.setItem('supa_token', _accessToken);
     localStorage.setItem('supa_refresh', res.refresh_token||'');
     localStorage.setItem('supa_user', JSON.stringify(currentUser));
-    if(typeof Sentry !== 'undefined') Sentry.addBreadcrumb({
+    if(typeof Sentry !== 'undefined' && typeof Sentry.addBreadcrumb === 'function') Sentry.addBreadcrumb({
       category: 'auth', message: 'Login com sucesso', level: 'info'
     });
     showApp();
@@ -1113,8 +1113,8 @@ async function doAuth() {
 function showApp() {
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app').style.display='flex';
-  // Identificar o utilizador no Sentry para rastrear erros por utilizador
-  if(typeof Sentry !== 'undefined') {
+  // Identificar o utilizador no Sentry — guarda defensiva contra SDK ainda não inicializado
+  if(typeof Sentry !== 'undefined' && typeof Sentry.setUser === 'function') {
     Sentry.setUser({ id: currentUser.id, email: currentUser.email });
   }
   init();
@@ -1166,7 +1166,7 @@ async function logout() {
   localStorage.removeItem('supa_refresh');
   localStorage.removeItem('supa_user');
   // Limpar utilizador do Sentry ao fazer logout
-  if(typeof Sentry !== 'undefined') Sentry.setUser(null);
+  if(typeof Sentry !== 'undefined' && typeof Sentry.setUser === 'function') Sentry.setUser(null);
   document.getElementById('app').style.display='none';
   document.getElementById('auth-screen').style.display='flex';
 }
@@ -1623,7 +1623,7 @@ function extractFromHash(hash, key) {
 }
 
 async function init(){
-  if(typeof Sentry !== 'undefined') Sentry.addBreadcrumb({
+  if(typeof Sentry !== 'undefined' && typeof Sentry.addBreadcrumb === 'function') Sentry.addBreadcrumb({
     category: 'app', message: 'init: aplicação iniciada', level: 'info'
   });
   // Show loading state
@@ -1998,7 +1998,7 @@ function styleLucro(){
 }
 
 async function saveBet(){
-  if(typeof Sentry !== 'undefined') Sentry.addBreadcrumb({
+  if(typeof Sentry !== 'undefined' && typeof Sentry.addBreadcrumb === 'function') Sentry.addBreadcrumb({
     category: 'bet', message: 'saveBet iniciado', level: 'info',
     data: { casa: document.getElementById('f-casa').value, resultado: selResult }
   });
@@ -2128,7 +2128,7 @@ function renderHistory(){
 }
 
 async function resolvebet(id, resultado) {
-  if(typeof Sentry !== 'undefined') Sentry.addBreadcrumb({
+  if(typeof Sentry !== 'undefined' && typeof Sentry.addBreadcrumb === 'function') Sentry.addBreadcrumb({
     category: 'bet', message: `resolvebet: ${resultado}`, level: 'info',
     data: { id, resultado }
   });
@@ -2216,7 +2216,7 @@ function styleLucroEdit(){
   l.className='if num'+(v>0?' pos':v<0?' neg':'');
 }
 function updateBet(){
-  if(typeof Sentry !== 'undefined') Sentry.addBreadcrumb({
+  if(typeof Sentry !== 'undefined' && typeof Sentry.addBreadcrumb === 'function') Sentry.addBreadcrumb({
     category: 'bet', message: 'updateBet iniciado', level: 'info',
     data: { id: editingId, resultado: editResult }
   });
@@ -2263,7 +2263,7 @@ function askDel(id){pendingId=String(id);document.getElementById('ov').classList
 function cancelDel(){document.getElementById('ov').classList.remove('show');pendingId=null;}
 function confirmDel(){
   const delId=pendingId;
-  if(typeof Sentry !== 'undefined') Sentry.addBreadcrumb({
+  if(typeof Sentry !== 'undefined' && typeof Sentry.addBreadcrumb === 'function') Sentry.addBreadcrumb({
     category: 'bet', message: 'confirmDel: aposta eliminada', level: 'info',
     data: { id: delId }
   });
