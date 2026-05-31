@@ -2464,6 +2464,15 @@ async function saveBet(){
     newBet.id = saved.id;
   }
   bets.unshift(newBet);
+
+  // Upload de imagem assíncrono — não bloqueia o registo da aposta
+  if (_imgState.add.pendingBlob) {
+    commitImageUpload('add', newBet.id);
+  }
+  // Reset estado de imagem do formulário add
+  _imgState.add = { pendingBlob: null, existingUrl: null, pendingRemove: false };
+  clearImgUI('add');
+
   buildYears(); updateHdr();
   ['f-gastos','f-reembolso','f-lucro','f-notas'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-data').value=new Date().toISOString().slice(0,10);
@@ -2611,6 +2620,8 @@ function openEdit(id){
   });
   styleLucroEdit();
   checkEditForm();
+  // Inicializar imagem no formulário de edição (miniatura se já existir)
+  initEditImage(b.imagem_url || null);
   // navigate to edit page
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-edit').classList.add('active');
@@ -2675,6 +2686,11 @@ function updateBet(){
     plataforma_id:plat_e?plat_e.id:bets[idx].plataforma_id
   };
   updateInDB(bets[idx]); buildYears(); updateHdr(); renderHistory(); renderAnalytics();
+
+  // Upload / remoção de imagem assíncrono
+  const _editBetId = bets[idx].id;
+  commitImageUpload('edit', _editBetId);
+
   editingId=null; editResult='';
 
   // Feedback: green button then redirect to history
