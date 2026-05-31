@@ -2,6 +2,9 @@ const CACHE_NAME = 'bettracker-v2';
 const SHELL_ASSETS = [
   './index.html',
   './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
+  './icon-180.png',
 ];
 
 // Domains that must NEVER be cached
