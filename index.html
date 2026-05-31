@@ -1900,7 +1900,7 @@ async function loadFromDB() {
   try {
     // supaRequest handles token expiry with automatic refresh
     const result = await supaRequest(() => supa.get(
-      `/rest/v1/apostas?user_id=eq.${currentUser.id}&select=*,imagem_url&order=data.desc,id.desc&limit=10000`,
+      `/rest/v1/apostas?user_id=eq.${currentUser.id}&order=data.desc,id.desc&limit=10000`,
       _accessToken
     ));
     if(!Array.isArray(result.data)) {
