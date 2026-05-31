@@ -2476,14 +2476,6 @@ async function saveBet(){
     _imgState.add.pendingBlob = null;
   }
 
-  // Upload de imagem assíncrono — não bloqueia o registo da aposta
-  if (_imgState.add.pendingBlob) {
-    commitImageUpload('add', newBet.id);
-  }
-  // Reset estado de imagem do formulário add
-  _imgState.add = { pendingBlob: null, existingUrl: null, pendingRemove: false };
-  clearImgUI('add');
-
   buildYears(); updateHdr();
   ['f-gastos','f-reembolso','f-lucro','f-notas'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-data').value=new Date().toISOString().slice(0,10);
