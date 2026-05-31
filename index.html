@@ -770,6 +770,21 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
         </div>
       </div>
 
+      <div class="sec-hdr">Imagem <span style="font-size:11px;font-weight:400;color:var(--label3)">(opcional)</span></div>
+      <div class="ig">
+        <div class="img-upload-row">
+          <label class="img-upload-label" for="img-pick-btn-edit">Foto / Print</label>
+          <span id="img-progress-edit" class="img-progress" aria-live="polite"></span>
+          <button
+            class="img-upload-btn"
+            id="img-pick-btn-edit"
+            onclick="handleImagePick('edit')"
+            aria-label="Selecionar imagem para esta aposta"
+          >Escolher</button>
+          <div id="img-thumb-wrap-edit" class="img-thumb-wrap" style="display:none"></div>
+        </div>
+      </div>
+
       <button class="btn-primary" id="btn-save" onclick="saveBet()" disabled>Registar Aposta</button>
       <div class="pb"></div>
     </div>
@@ -841,6 +856,21 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
         <div class="ir">
           <!-- [A] Campo sem label visual — adicionado aria-label para leitores de ecrã -->
           <input type="text" class="if" id="e-notas" placeholder="Ex: Futebol, Liga Portugal…" style="text-align:left" aria-label="Notas">
+        </div>
+      </div>
+
+      <div class="sec-hdr">Imagem <span style="font-size:11px;font-weight:400;color:var(--label3)">(opcional)</span></div>
+      <div class="ig">
+        <div class="img-upload-row">
+          <label class="img-upload-label" for="img-pick-btn-edit">Foto / Print</label>
+          <span id="img-progress-edit" class="img-progress" aria-live="polite"></span>
+          <button
+            class="img-upload-btn"
+            id="img-pick-btn-edit"
+            onclick="handleImagePick('edit')"
+            aria-label="Selecionar imagem para esta aposta"
+          >Escolher</button>
+          <div id="img-thumb-wrap-edit" class="img-thumb-wrap" style="display:none"></div>
         </div>
       </div>
 
@@ -2672,7 +2702,9 @@ function confirmDel(){
     data: { id: delId }
   });
   bets=bets.filter(b=>String(b.id)!==String(delId));
-  deleteFromDB(delId); buildYears(); updateHdr();renderHistory();renderAnalytics();
+  deleteFromDB(delId);
+  ImageUploader.remove(delId).catch(() => {}); // limpa imagem do Storage se existir
+  buildYears(); updateHdr();renderHistory();renderAnalytics();
   cancelDel();
 }
 document.getElementById('ov').addEventListener('click',e=>{if(e.target.id==='ov')cancelDel();});
