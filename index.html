@@ -2328,8 +2328,9 @@ function updateDisplays(){
 
 function renderCalendar(){
   document.getElementById('cal-title').textContent=MNAMES_PT[_calMonth]+' '+_calYear;
-  const min=window._drMin||'';
-  const max=window._drMax||'';
+  // Para formulários de aposta, não aplicar limite mínimo (apenas hoje como máximo)
+  const min = _calTargetId ? '' : (window._drMin||'');
+  const max = _calTargetId ? new Date().toISOString().slice(0,10) : (window._drMax||'');
   const fromVal=document.getElementById('h-from').value;
   const toVal=document.getElementById('h-to').value;
   const today=new Date().toISOString().slice(0,10);
