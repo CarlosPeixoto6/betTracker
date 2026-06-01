@@ -1771,50 +1771,27 @@ function initEditImage(imageUrl) {
 
 // ── DB operations ─────────────────────────────
 // ── Plataformas ───────────────────────────────
-let plataformas = []; // [{id, nome}]
+/**
+ * Plataformas globais definidas no código.
+ * Para adicionar uma nova plataforma global, edita este array e faz deploy.
+ * A BD é a fonte de verdade — este array serve apenas de referência local.
+ */
+const GLOBAL_PLATFORMS = ['22Bet', 'Betclic', 'Betano', 'Solverde', 'Café Prestígio'];
 
+let plataformas = []; // [{id, nome, is_global}]
+
+/**
+ * Carrega plataformas visíveis para o utilizador:
+ * globais (is_global = true) + custom do próprio (user_id = auth.uid()).
+ * A RLS do Supabase garante o filtro — não é necessário filtrar aqui.
+ */
 async function loadPlataformas() {
-  // supaRequest handles token expiry with automatic refresh
   const result = await supaRequest(() => supa.get(
-    `/rest/v1/plataformas?user_id=eq.${currentUser.id}&order=nome.asc`,
+    `/rest/v1/plataformas?order=nome.asc`,
     _accessToken
   ));
   plataformas = Array.isArray(result.data) ? result.data : [];
-  // Seed default platforms if none exist
-  if(plataformas.length === 0) await seedPlataformas();
-  else buildPlataformaSelects();
-}
-
-async function seedPlataformas() {
-  const defaults = ['22Bet','Betclic','Betano','Café Prestígio'];
-  for(const nome of defaults) {
-    await supa.insert('plataformas', {
-      user_id: currentUser.id, nome
-    }, _accessToken);
-  }
-  await loadPlataformas();
-}
-
-async function addPlataforma(nome, activeSelId) {
-  // Add to local array immediately (optimistic update)
-  if(!plataformas.find(p => p.nome === nome)) {
-    plataformas.push({id: null, nome});
-    plataformas.sort((a,b) => a.nome.localeCompare(b.nome));
-  }
-  const selectValues = activeSelId ? {[activeSelId]: nome} : {};
-  buildPlataformaSelects(selectValues);
-  // Save to DB in background
-  const {error} = await supa.insert('plataformas', {
-    user_id: currentUser.id, nome
-  }, _accessToken);
-  if(error){ console.error('Add plataforma error:', error); return null; }
-  // Update local array with real ID from DB
-  const {data} = await supa.get(
-    `/rest/v1/plataformas?user_id=eq.${currentUser.id}&order=nome.asc`,
-    _accessToken
-  );
-  if(Array.isArray(data)) plataformas = data;
-  return plataformas.find(p => p.nome === nome);
+  buildPlataformaSelects();
 }
 
 function buildPlataformaSelects(selectValues) {
@@ -1843,13 +1820,23 @@ async function handlePlataformaChange(selId, newFieldId) {
   if(selId === 'f-casa' || selId === 'e-casa') checkForm();
 }
 
+/**
+ * Confirma a criação de uma nova plataforma custom pelo utilizador.
+ * Normaliza o nome (capitaliza palavras), verifica duplicados case-insensitive
+ * contra globais e custom existentes, e guarda na BD com is_global = false.
+ */
 async function confirmNovaPlataforma(inputId, selId, newFieldId) {
   const input = document.getElementById(inputId);
-  const nome = input.value.trim();
-  if(!nome) return;
 
-  // Check duplicate
-  const existing = plataformas.find(p => p.nome.toLowerCase() === nome.toLowerCase());
+  // Normalizar: capitaliza primeira letra de cada palavra, colapsa espaços
+  const nomeNormalizado = input.value.trim()
+    .replace(/\s+/g, ' ')
+    .replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+
+  if(!nomeNormalizado) return;
+
+  // Verificar duplicado case-insensitive (globais + custom do utilizador)
+  const existing = plataformas.find(p => p.nome.toLowerCase() === nomeNormalizado.toLowerCase());
   if(existing) {
     document.getElementById(selId).value = existing.nome;
     document.getElementById(newFieldId).style.display = 'none';
@@ -1857,40 +1844,38 @@ async function confirmNovaPlataforma(inputId, selId, newFieldId) {
     return;
   }
 
-  // Optimistic: add to all selects immediately before DB call
+  // Atualização optimista: adiciona aos selects imediatamente
   ['f-casa','e-casa','h-casa'].forEach(id => {
     const sel = document.getElementById(id);
     if(!sel) return;
-    // Insert before the last option (+ Adicionar plataforma) or at end
     const addOpt = [...sel.options].find(o => o.value === '__nova__');
-    const newOpt = new Option(nome, nome, false, id === selId);
+    const newOpt = new Option(nomeNormalizado, nomeNormalizado, false, id === selId);
     if(addOpt) sel.insertBefore(newOpt, addOpt);
     else sel.add(newOpt);
   });
 
-  // Select immediately
-  document.getElementById(selId).value = nome;
+  document.getElementById(selId).value = nomeNormalizado;
   document.getElementById(newFieldId).style.display = 'none';
   input.value = '';
   if(selId === 'f-casa' || selId === 'e-casa') checkForm();
 
-  // Save to DB
+  // Guardar na BD como plataforma custom do utilizador
   try {
     const result = await supaRequest(() => supa.insert('plataformas', {
-      user_id: currentUser.id, nome
+      user_id: currentUser.id,
+      nome: nomeNormalizado,
+      is_global: false
     }, _accessToken));
-    if(result.error || (Array.isArray(result.data) && result.data.length === 0)) {
-      alert('Erro ao guardar: ' + JSON.stringify(result));
+    if(result.error) {
+      console.error('Erro ao guardar plataforma:', result.error);
+      showToast('Erro ao guardar plataforma. Tenta novamente.', 'error');
     } else {
-      const {data} = await supa.get(
-        `/rest/v1/plataformas?user_id=eq.${currentUser.id}&order=nome.asc`,
-        _accessToken
-      );
-      plataformas = Array.isArray(data) ? data : [];
+      // Recarrega array local para incluir o novo ID da BD
+      await loadPlataformas();
     }
   } catch(e) {
-    alert('Exceção: ' + e.message);
     console.error('Exception inserting plataforma:', e);
+    showToast('Erro ao guardar plataforma. Verifica a ligação.', 'error');
   }
 }
 
