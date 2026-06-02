@@ -542,6 +542,114 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
 .toast.show { opacity:1; }
 .toast.error { background:#c0392b; }
 .toast.success { background:#27ae60; }
+  /* ── Image Upload ────────────────────────────────────────────────────── */
+.img-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  position: relative;
+}
+.ir + .img-upload-row::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 16px; right: 0;
+  height: 0.5px;
+  background: var(--sep);
+}
+.img-upload-label {
+  font-size: 14px;
+  letter-spacing: -0.4px;
+  color: var(--label3);
+  min-width: 95px;
+  flex-shrink: 0;
+}
+.img-upload-btn {
+  margin-left: auto;
+  background: var(--fill);
+  border: none;
+  border-radius: 9px;
+  padding: 7px 13px;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue);
+  cursor: pointer;
+  transition: opacity .15s;
+  flex-shrink: 0;
+}
+.img-upload-btn:active { opacity: .65; }
+.img-thumb-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.img-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 9px;
+  object-fit: cover;
+  cursor: pointer;
+  border: 1.5px solid var(--sep);
+  transition: opacity .15s;
+}
+.img-thumb:active { opacity: .7; }
+.img-remove-btn {
+  background: none;
+  border: none;
+  color: var(--label3);
+  padding: 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color .15s, background .15s;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+.img-remove-btn:active { color: var(--red); background: rgba(255,59,48,.1); }
+.img-progress {
+  font-size: 12px;
+  color: var(--label3);
+  margin-left: auto;
+  font-weight: 500;
+}
+.img-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: rgba(0,0,0,.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.img-lightbox img {
+  max-width: 100%;
+  max-height: 85dvh;
+  border-radius: 14px;
+  object-fit: contain;
+  box-shadow: 0 8px 60px rgba(0,0,0,.6);
+}
+.img-lightbox-close {
+  position: absolute;
+  top: calc(var(--safe-top) + 12px);
+  right: 16px;
+  background: rgba(255,255,255,.15);
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  font-size: 20px;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
 </style>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png" type="image/png">
@@ -654,11 +762,25 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
         </button>
       </div>
 
-      <div class="sec-hdr">Notas</div>
+      <div class="sec-hdr">Notas <span style="font-size:11px;font-weight:400;color:var(--label3);text-transform:none;letter-spacing:0">(opcional)</span></div>
       <div class="ig">
         <div class="ir">
-          <!-- [A] Campo sem label visual — adicionado aria-label para leitores de ecrã -->
-          <input type="text" class="if" id="f-notas" placeholder="Ex: Futebol, Liga Portugal…" style="text-align:left" aria-label="Notas">
+          <input type="text" class="if" id="e-notas" placeholder="Ex: Futebol, Liga Portugal…" style="text-align:left" aria-label="Notas">
+        </div>
+      </div>
+
+      <div class="sec-hdr">Anexo <span style="font-size:11px;font-weight:400;color:var(--label3);text-transform:none;letter-spacing:0">(opcional)</span></div>
+      <div class="ig">
+        <div class="img-upload-row">
+          <label class="img-upload-label" for="img-pick-btn-edit">Upload de imagem</label>
+          <span id="img-progress-add" class="img-progress" aria-live="polite"></span>
+          <button
+            class="img-upload-btn"
+            id="img-pick-btn-add"
+            onclick="handleImagePick('add')"
+            aria-label="Selecionar imagem para esta aposta"
+          >Escolher</button>
+          <div id="img-thumb-wrap-add" class="img-thumb-wrap" style="display:none"></div>
         </div>
       </div>
 
@@ -728,11 +850,25 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
         </button>
       </div>
 
-      <div class="sec-hdr">Notas</div>
+      <div class="sec-hdr">Notas <span style="font-size:11px;font-weight:400;color:var(--label3);text-transform:none;letter-spacing:0">(opcional)</span></div>
       <div class="ig">
         <div class="ir">
-          <!-- [A] Campo sem label visual — adicionado aria-label para leitores de ecrã -->
-          <input type="text" class="if" id="e-notas" placeholder="Ex: Futebol, Liga Portugal…" style="text-align:left" aria-label="Notas">
+          <input type="text" class="if" id="f-notas" placeholder="Ex: Futebol, Liga Portugal…" style="text-align:left" aria-label="Notas">
+        </div>
+      </div>
+
+      <div class="sec-hdr">Anexo <span style="font-size:11px;font-weight:400;color:var(--label3);text-transform:none;letter-spacing:0">(opcional)</span></div>
+      <div class="ig">
+        <div class="img-upload-row">
+          <label class="img-upload-label" for="img-pick-btn-add">Upload de imagem</label>
+          <span id="img-progress-edit" class="img-progress" aria-live="polite"></span>
+          <button
+            class="img-upload-btn"
+            id="img-pick-btn-edit"
+            onclick="handleImagePick('edit')"
+            aria-label="Selecionar imagem para esta aposta"
+          >Escolher</button>
+          <div id="img-thumb-wrap-edit" class="img-thumb-wrap" style="display:none"></div>
         </div>
       </div>
 
@@ -1343,53 +1479,319 @@ const InactivityTimer = (() => {
   // API pública
   return { loadConfig, start, stop };
 })();
+// ── ImageUploader ─────────────────────────────────────────────────────────
+/**
+ * Módulo responsável por comprimir, fazer upload, remover e
+ * construir URLs de imagens associadas a apostas no Supabase Storage.
+ *
+ * Estrutura do bucket: apostas-imagens/{user_id}/{bet_id}.jpg
+ * Compressão: reduz para máx. 1200px no lado maior, qualidade 0.82 JPEG.
+ * Limite após compressão: 3 MB (rejeita com mensagem clara se ultrapassar).
+ */
+const ImageUploader = (() => {
+  const BUCKET      = 'apostas-imagens';
+  const MAX_PX      = 1200;
+  const QUALITY     = 0.82;
+  const MAX_BYTES   = 3 * 1024 * 1024; // 3 MB
+  const STORAGE_URL = `${SUPA_URL}/storage/v1`;
+
+  /**
+   * Comprime um File (JPEG ou PNG) via Canvas API.
+   * Redimensiona mantendo aspect ratio se algum lado > MAX_PX.
+   * Converte sempre para JPEG para poupar espaço.
+   * Rejeita se o resultado ultrapassar MAX_BYTES.
+   */
+  function compress(file) {
+    return new Promise((resolve, reject) => {
+      if (!['image/jpeg', 'image/png'].includes(file.type)) {
+        reject(new Error('Formato inválido. Usa apenas JPG ou PNG.')); return;
+      }
+      const img    = new Image();
+      const objUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(objUrl);
+        let { width, height } = img;
+        if (width > MAX_PX || height > MAX_PX) {
+          if (width >= height) { height = Math.round((height / width) * MAX_PX); width = MAX_PX; }
+          else                 { width  = Math.round((width / height) * MAX_PX); height = MAX_PX; }
+        }
+        const canvas  = document.createElement('canvas');
+        canvas.width  = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        canvas.toBlob(blob => {
+          if (!blob) { reject(new Error('Falha ao comprimir a imagem.')); return; }
+          if (blob.size > MAX_BYTES) {
+            reject(new Error(
+              `A imagem comprimida ocupa ${(blob.size/1024/1024).toFixed(1)} MB, ` +
+              `acima do limite de 3 MB. Usa uma imagem mais pequena.`
+            )); return;
+          }
+          resolve(blob);
+        }, 'image/jpeg', QUALITY);
+      };
+      img.onerror = () => { URL.revokeObjectURL(objUrl); reject(new Error('Não foi possível ler a imagem.')); };
+      img.src = objUrl;
+    });
+  }
+
+  /**
+   * Faz upload (upsert) de um Blob JPEG para o Supabase Storage.
+   * Caminho: {user_id}/{bet_id}.jpg
+   */
+  async function upload(blob, betId) {
+    if (!currentUser?.id) throw new Error('Utilizador não autenticado.');
+    if (!betId)           throw new Error('ID da aposta inválido.');
+    const path     = `${currentUser.id}/${betId}.jpg`;
+    const endpoint = `${STORAGE_URL}/object/${BUCKET}/${path}`;
+    const response = await fetch(endpoint, {
+      method:  'POST',
+      headers: {
+        'Authorization': `Bearer ${_accessToken}`,
+        'apikey':        SUPA_KEY,
+        'Content-Type':  'image/jpeg',
+        'x-upsert':      'true',
+      },
+      body: blob,
+    });
+    if (!response.ok) {
+      const errText = await response.text().catch(() => response.statusText);
+      throw new Error(`Erro no upload (${response.status}): ${errText}`);
+    }
+    return getUrl(betId);
+  }
+
+  /**
+   * Remove a imagem de uma aposta do Supabase Storage.
+   * Ignora silenciosamente se não existir (404).
+   */
+  async function remove(betId) {
+    if (!currentUser?.id || !betId) return;
+    const path     = `${currentUser.id}/${betId}.jpg`;
+    const endpoint = `${STORAGE_URL}/object/${BUCKET}/${path}`;
+    const response = await fetch(endpoint, {
+      method:  'DELETE',
+      headers: { 'Authorization': `Bearer ${_accessToken}`, 'apikey': SUPA_KEY },
+    });
+    if (!response.ok && response.status !== 404) {
+      const errText = await response.text().catch(() => response.statusText);
+      throw new Error(`Erro ao remover imagem (${response.status}): ${errText}`);
+    }
+  }
+
+  /**
+   * Constrói a URL pública de uma imagem no bucket.
+   */
+  function getUrl(betId) {
+    if (!currentUser?.id || !betId) return '';
+    return `${STORAGE_URL}/object/public/${BUCKET}/${currentUser.id}/${betId}.jpg`;
+  }
+
+  /**
+   * Persiste (ou limpa) o campo imagem_url na tabela apostas via PATCH.
+   */
+  async function updateBetImageUrl(betId, url) {
+    const endpoint = `${SUPA_URL}/rest/v1/apostas?id=eq.${betId}&user_id=eq.${currentUser.id}`;
+    const response = await fetch(endpoint, {
+      method:  'PATCH',
+      headers: {
+        'Authorization': `Bearer ${_accessToken}`,
+        'apikey':        SUPA_KEY,
+        'Content-Type':  'application/json',
+        'Prefer':        'return=minimal',
+      },
+      body: JSON.stringify({ imagem_url: url }),
+    });
+    if (!response.ok) {
+      const errText = await response.text().catch(() => response.statusText);
+      throw new Error(`Erro ao guardar URL da imagem (${response.status}): ${errText}`);
+    }
+  }
+
+  return { compress, upload, remove, getUrl, updateBetImageUrl };
+})();
+
+// ── Image Upload UI ───────────────────────────────────────────────────────
+
+/**
+ * Estado de upload por formulário ('add' | 'edit').
+ */
+const _imgState = {
+  add:  { pendingBlob: null, existingUrl: null, pendingRemove: false },
+  edit: { pendingBlob: null, existingUrl: null, pendingRemove: false },
+};
+
+/**
+ * Abre o seletor de ficheiro nativo, comprime a imagem escolhida
+ * e armazena o Blob em _imgState[form].pendingBlob.
+ */
+function handleImagePick(form) {
+  const input  = document.createElement('input');
+  input.type   = 'file';
+  input.accept = 'image/jpeg,image/png';
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    setImgProgress(form, 'A comprimir…');
+    try {
+      const blob = await ImageUploader.compress(file);
+      _imgState[form].pendingBlob    = blob;
+      _imgState[form].pendingRemove  = false;
+      renderImgThumb(form, URL.createObjectURL(blob), true);
+      setImgProgress(form, '');
+    } catch (err) {
+      setImgProgress(form, '');
+      showToast(err.message, 'error', 4000);
+      if (typeof Sentry !== 'undefined') Sentry.captureException(err);
+    }
+  };
+  input.click();
+}
+
+/**
+ * Renderiza a miniatura (48×48) e botão de remover no formulário.
+ */
+function renderImgThumb(form, src, isLocal) {
+  const wrap = document.getElementById(`img-thumb-wrap-${form}`);
+  const btn  = document.getElementById(`img-pick-btn-${form}`);
+  if (!wrap || !btn) return;
+  btn.style.display  = 'none';
+  wrap.style.display = 'flex';
+  wrap.innerHTML = `
+    <img class="img-thumb" src="${esc(src)}" alt="Imagem da aposta"
+      onclick="openLightbox('${esc(src)}')"
+      aria-label="Ver imagem em tamanho completo">
+    <button class="img-remove-btn" onclick="handleImageRemove('${esc(form)}')" aria-label="Remover imagem">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2"/>
+      </svg>
+    </button>`;
+}
+
+/**
+ * Marca a imagem para remoção e limpa a UI (a remoção real ocorre no save).
+ */
+function handleImageRemove(form) {
+  _imgState[form].pendingBlob   = null;
+  _imgState[form].pendingRemove = true;
+  clearImgUI(form);
+}
+
+/**
+ * Repõe a UI de upload ao estado inicial (sem imagem).
+ */
+function clearImgUI(form) {
+  const wrap = document.getElementById(`img-thumb-wrap-${form}`);
+  const btn  = document.getElementById(`img-pick-btn-${form}`);
+  if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
+  if (btn)  btn.style.display = '';
+}
+
+/**
+ * Atualiza a mensagem de progresso inline no formulário.
+ */
+function setImgProgress(form, msg) {
+  const el = document.getElementById(`img-progress-${form}`);
+  if (el) el.textContent = msg;
+}
+
+/**
+ * Abre o lightbox com a imagem fornecida.
+ */
+function openLightbox(src) {
+  const existing = document.getElementById('img-lightbox');
+  if (existing) existing.remove();
+  const lb = document.createElement('div');
+  lb.className = 'img-lightbox';
+  lb.id        = 'img-lightbox';
+  lb.setAttribute('role', 'dialog');
+  lb.setAttribute('aria-label', 'Imagem da aposta em tamanho completo');
+  lb.innerHTML = `
+    <button class="img-lightbox-close" onclick="closeLightbox()" aria-label="Fechar">×</button>
+    <img src="${esc(src)}" alt="Imagem da aposta em tamanho completo">`;
+  lb.addEventListener('click', e => { if (e.target === lb) closeLightbox(); });
+  document.body.appendChild(lb);
+}
+
+/** Fecha e remove o lightbox do DOM. */
+function closeLightbox() {
+  const lb = document.getElementById('img-lightbox');
+  if (lb) lb.remove();
+}
+
+/**
+ * Executa o upload ou remoção da imagem após guardar a aposta.
+ * Chamado por saveBet() e updateBet() com o betId real já confirmado.
+ */
+async function commitImageUpload(form, betId) {
+  const state = _imgState[form];
+  if (state.pendingRemove && !state.pendingBlob) {
+    state.pendingRemove = false;
+    try {
+      await ImageUploader.remove(betId);
+      await ImageUploader.updateBetImageUrl(betId, null);
+      const idx = bets.findIndex(b => String(b.id) === String(betId));
+      if (idx >= 0) bets[idx].imagem_url = null;
+    } catch (err) {
+      showToast('Erro ao remover imagem.', 'error');
+      if (typeof Sentry !== 'undefined') Sentry.captureException(err);
+    }
+    return null;
+  }
+  if (!state.pendingBlob) return state.existingUrl || null;
+  setImgProgress(form, 'A enviar…');
+  try {
+    const url = await ImageUploader.upload(state.pendingBlob, betId);
+    await ImageUploader.updateBetImageUrl(betId, url);
+    const idx = bets.findIndex(b => String(b.id) === String(betId));
+    if (idx >= 0) bets[idx].imagem_url = url;
+    state.pendingBlob   = null;
+    state.existingUrl   = url;
+    state.pendingRemove = false;
+    setImgProgress(form, '');
+    return url;
+  } catch (err) {
+    setImgProgress(form, '');
+    showToast('Aposta guardada, mas a imagem falhou: ' + err.message, 'error', 5000);
+    if (typeof Sentry !== 'undefined') Sentry.captureException(err);
+    return null;
+  }
+}
+
+/**
+ * Inicializa o estado de imagem no formulário de edição.
+ * Chamado por openEdit() para pré-carregar a miniatura se existir.
+ */
+function initEditImage(imageUrl) {
+  _imgState.edit = { pendingBlob: null, existingUrl: imageUrl || null, pendingRemove: false };
+  clearImgUI('edit');
+  if (imageUrl) renderImgThumb('edit', imageUrl, false);
+}
 
 // ── DB operations ─────────────────────────────
 // ── Plataformas ───────────────────────────────
-let plataformas = []; // [{id, nome}]
+/**
+ * Plataformas globais definidas no código.
+ * Para adicionar uma nova plataforma global, edita este array e faz deploy.
+ * A BD é a fonte de verdade — este array serve apenas de referência local.
+ */
+const GLOBAL_PLATFORMS = ['22Bet', 'Betclic', 'Betano', 'Solverde', 'Café Prestígio'];
 
+let plataformas = []; // [{id, nome, is_global}]
+
+/**
+ * Carrega plataformas visíveis para o utilizador:
+ * globais (is_global = true) + custom do próprio (user_id = auth.uid()).
+ * A RLS do Supabase garante o filtro — não é necessário filtrar aqui.
+ */
 async function loadPlataformas() {
-  // supaRequest handles token expiry with automatic refresh
   const result = await supaRequest(() => supa.get(
-    `/rest/v1/plataformas?user_id=eq.${currentUser.id}&order=nome.asc`,
+    `/rest/v1/plataformas?order=nome.asc`,
     _accessToken
   ));
   plataformas = Array.isArray(result.data) ? result.data : [];
-  // Seed default platforms if none exist
-  if(plataformas.length === 0) await seedPlataformas();
-  else buildPlataformaSelects();
-}
-
-async function seedPlataformas() {
-  const defaults = ['22Bet','Betclic','Betano','Café Prestígio'];
-  for(const nome of defaults) {
-    await supa.insert('plataformas', {
-      user_id: currentUser.id, nome
-    }, _accessToken);
-  }
-  await loadPlataformas();
-}
-
-async function addPlataforma(nome, activeSelId) {
-  // Add to local array immediately (optimistic update)
-  if(!plataformas.find(p => p.nome === nome)) {
-    plataformas.push({id: null, nome});
-    plataformas.sort((a,b) => a.nome.localeCompare(b.nome));
-  }
-  const selectValues = activeSelId ? {[activeSelId]: nome} : {};
-  buildPlataformaSelects(selectValues);
-  // Save to DB in background
-  const {error} = await supa.insert('plataformas', {
-    user_id: currentUser.id, nome
-  }, _accessToken);
-  if(error){ console.error('Add plataforma error:', error); return null; }
-  // Update local array with real ID from DB
-  const {data} = await supa.get(
-    `/rest/v1/plataformas?user_id=eq.${currentUser.id}&order=nome.asc`,
-    _accessToken
-  );
-  if(Array.isArray(data)) plataformas = data;
-  return plataformas.find(p => p.nome === nome);
+  buildPlataformaSelects();
 }
 
 function buildPlataformaSelects(selectValues) {
@@ -1418,13 +1820,23 @@ async function handlePlataformaChange(selId, newFieldId) {
   if(selId === 'f-casa' || selId === 'e-casa') checkForm();
 }
 
+/**
+ * Confirma a criação de uma nova plataforma custom pelo utilizador.
+ * Normaliza o nome (capitaliza palavras), verifica duplicados case-insensitive
+ * contra globais e custom existentes, e guarda na BD com is_global = false.
+ */
 async function confirmNovaPlataforma(inputId, selId, newFieldId) {
   const input = document.getElementById(inputId);
-  const nome = input.value.trim();
-  if(!nome) return;
 
-  // Check duplicate
-  const existing = plataformas.find(p => p.nome.toLowerCase() === nome.toLowerCase());
+  // Normalizar: capitaliza primeira letra de cada palavra, colapsa espaços
+  const nomeNormalizado = input.value.trim()
+    .replace(/\s+/g, ' ')
+    .replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+
+  if(!nomeNormalizado) return;
+
+  // Verificar duplicado case-insensitive (globais + custom do utilizador)
+  const existing = plataformas.find(p => p.nome.toLowerCase() === nomeNormalizado.toLowerCase());
   if(existing) {
     document.getElementById(selId).value = existing.nome;
     document.getElementById(newFieldId).style.display = 'none';
@@ -1432,40 +1844,38 @@ async function confirmNovaPlataforma(inputId, selId, newFieldId) {
     return;
   }
 
-  // Optimistic: add to all selects immediately before DB call
+  // Atualização optimista: adiciona aos selects imediatamente
   ['f-casa','e-casa','h-casa'].forEach(id => {
     const sel = document.getElementById(id);
     if(!sel) return;
-    // Insert before the last option (+ Adicionar plataforma) or at end
     const addOpt = [...sel.options].find(o => o.value === '__nova__');
-    const newOpt = new Option(nome, nome, false, id === selId);
+    const newOpt = new Option(nomeNormalizado, nomeNormalizado, false, id === selId);
     if(addOpt) sel.insertBefore(newOpt, addOpt);
     else sel.add(newOpt);
   });
 
-  // Select immediately
-  document.getElementById(selId).value = nome;
+  document.getElementById(selId).value = nomeNormalizado;
   document.getElementById(newFieldId).style.display = 'none';
   input.value = '';
   if(selId === 'f-casa' || selId === 'e-casa') checkForm();
 
-  // Save to DB
+  // Guardar na BD como plataforma custom do utilizador
   try {
     const result = await supaRequest(() => supa.insert('plataformas', {
-      user_id: currentUser.id, nome
+      user_id: currentUser.id,
+      nome: nomeNormalizado,
+      is_global: false
     }, _accessToken));
-    if(result.error || (Array.isArray(result.data) && result.data.length === 0)) {
-      alert('Erro ao guardar: ' + JSON.stringify(result));
+    if(result.error) {
+      console.error('Erro ao guardar plataforma:', result.error);
+      showToast('Erro ao guardar plataforma. Tenta novamente.', 'error');
     } else {
-      const {data} = await supa.get(
-        `/rest/v1/plataformas?user_id=eq.${currentUser.id}&order=nome.asc`,
-        _accessToken
-      );
-      plataformas = Array.isArray(data) ? data : [];
+      // Recarrega array local para incluir o novo ID da BD
+      await loadPlataformas();
     }
   } catch(e) {
-    alert('Exceção: ' + e.message);
     console.error('Exception inserting plataforma:', e);
+    showToast('Erro ao guardar plataforma. Verifica a ligação.', 'error');
   }
 }
 
@@ -1903,8 +2313,9 @@ function updateDisplays(){
 
 function renderCalendar(){
   document.getElementById('cal-title').textContent=MNAMES_PT[_calMonth]+' '+_calYear;
-  const min=window._drMin||'';
-  const max=window._drMax||'';
+  // Para formulários de aposta, não aplicar limite mínimo (apenas hoje como máximo)
+  const min = _calTargetId ? '' : (window._drMin||'');
+  const max = _calTargetId ? new Date().toISOString().slice(0,10) : (window._drMax||'');
   const fromVal=document.getElementById('h-from').value;
   const toVal=document.getElementById('h-to').value;
   const today=new Date().toISOString().slice(0,10);
@@ -2037,6 +2448,14 @@ async function saveBet(){
     newBet.id = saved.id;
   }
   bets.unshift(newBet);
+
+   // Upload de imagem: executa antes de limpar UI, com o betId real confirmado
+  if (_imgState.add.pendingBlob) {
+    await commitImageUpload('add', newBet.id);
+  }
+  _imgState.add = { pendingBlob: null, existingUrl: null, pendingRemove: false };
+  clearImgUI('add');
+
   buildYears(); updateHdr();
   ['f-gastos','f-reembolso','f-lucro','f-notas'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-data').value=new Date().toISOString().slice(0,10);
@@ -2184,6 +2603,8 @@ function openEdit(id){
   });
   styleLucroEdit();
   checkEditForm();
+  // Inicializar imagem no formulário de edição (miniatura se já existir)
+  initEditImage(b.imagem_url || null);
   // navigate to edit page
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-edit').classList.add('active');
@@ -2248,6 +2669,11 @@ function updateBet(){
     plataforma_id:plat_e?plat_e.id:bets[idx].plataforma_id
   };
   updateInDB(bets[idx]); buildYears(); updateHdr(); renderHistory(); renderAnalytics();
+
+  // Upload / remoção de imagem assíncrono
+  const _editBetId = bets[idx].id;
+  commitImageUpload('edit', _editBetId);
+
   editingId=null; editResult='';
 
   // Feedback: green button then redirect to history
@@ -2275,7 +2701,9 @@ function confirmDel(){
     data: { id: delId }
   });
   bets=bets.filter(b=>String(b.id)!==String(delId));
-  deleteFromDB(delId); buildYears(); updateHdr();renderHistory();renderAnalytics();
+  deleteFromDB(delId);
+  ImageUploader.remove(delId).catch(() => {}); // limpa imagem do Storage se existir
+  buildYears(); updateHdr();renderHistory();renderAnalytics();
   cancelDel();
 }
 document.getElementById('ov').addEventListener('click',e=>{if(e.target.id==='ov')cancelDel();});
