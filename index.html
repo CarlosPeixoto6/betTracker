@@ -130,11 +130,11 @@ select.if.placeholder { color:var(--label3); font-size:13px; }
 .btn-primary:disabled { background:var(--fill); color:var(--label3); cursor:not-allowed; transform:none; }
 .btn-cancel-edit {
   display: block; width: calc(100% - 32px); margin: 4px 16px 4px;
-  padding: 16px; background: transparent; color: var(--label2); border: none;
+  padding: 16px; background: var(--fill); color: var(--label2); border: none;
   border-radius: 13px; font-family: var(--font); font-size: 14px;
   font-weight: 600; letter-spacing: -0.4px; cursor: pointer; transition: all .15s;
 }
-.btn-cancel-edit:active { background: var(--fill); opacity: .8; }
+.btn-cancel-edit:active { opacity: .7; }
 
 @media (min-width: 600px) {
   .btn-cancel-edit { width: 100%; margin-left: 0; margin-right: 0; }
