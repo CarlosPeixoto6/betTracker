@@ -1313,6 +1313,9 @@ async function checkSession() {
 async function logout() {
   try { await supa.post('/auth/v1/logout', {}, _accessToken); } catch(e) {}
   _accessToken = null; currentUser = null; bets = [];
+  // Reset de estado de sessão para evitar comportamento incorreto após re-login
+  pendingId = null; _pendingEditId = null; _asMode = 'delete';
+  editingId = null; editResult = '';
   localStorage.removeItem('supa_token');
   localStorage.removeItem('supa_refresh');
   localStorage.removeItem('supa_user');
