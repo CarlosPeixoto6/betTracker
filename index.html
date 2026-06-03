@@ -672,11 +672,13 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
     environment: location.hostname === 'bettracker.pt' ? 'production' : 'development',
     tracesSampleRate: 1.0,
     beforeSend(event) {
-  // Don't send events in development
   if(location.hostname === 'localhost' || location.protocol === 'file:') return null;
-  // Ignorar "Script error." sem stacktrace útil (erro cross-origin sem CORS headers)
-  const msg = event?.exception?.values?.[0]?.value || '';
-  if(msg === 'Script error.' || msg === 'Script error') return null;
+  // Filtra "Script error." vindo de exception.values OU de event.message
+  // (Mobile Safari envia-o via onerror sem exception.values populado)
+  const exMsg = event?.exception?.values?.[0]?.value || '';
+  const evMsg = event?.message || '';
+  const isScriptError = (s) => s === 'Script error.' || s === 'Script error';
+  if(isScriptError(exMsg) || isScriptError(evMsg)) return null;
   return event;
 }
   });
