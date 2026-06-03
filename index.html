@@ -128,6 +128,17 @@ select.if.placeholder { color:var(--label3); font-size:13px; }
 .btn-primary:active { transform:scale(0.98); opacity:.85; }
 .btn-primary.ok { background:var(--green); }
 .btn-primary:disabled { background:var(--fill); color:var(--label3); cursor:not-allowed; transform:none; }
+.btn-cancel-edit {
+  display: block; width: calc(100% - 32px); margin: 4px 16px 4px;
+  padding: 16px; background: transparent; color: var(--label2); border: none;
+  border-radius: 13px; font-family: var(--font); font-size: 14px;
+  font-weight: 600; letter-spacing: -0.4px; cursor: pointer; transition: all .15s;
+}
+.btn-cancel-edit:active { background: var(--fill); opacity: .8; }
+
+@media (min-width: 600px) {
+  .btn-cancel-edit { width: 100%; margin-left: 0; margin-right: 0; }
+}
 
 /* Summary card */
 .sum-card {
@@ -873,6 +884,7 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
       </div>
 
       <button class="btn-primary" id="btn-edit-save" onclick="updateBet()" disabled>Guardar Alterações</button>
+      <button class="btn-cancel-edit" id="btn-cancel-edit" onclick="askCancelEdit()" aria-label="Cancelar edição e voltar ao histórico">Cancelar</button>
       <div class="pb"></div>
     </div>
 
@@ -1043,13 +1055,13 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
 <div class="ov" id="ov">
   <div class="as">
     <div class="as-main">
-      <div class="as-title">
-        <h3>Apagar aposta?</h3>
-        <p>Esta ação não pode ser desfeita.</p>
-      </div>
-      <button class="as-btn red" onclick="confirmDel()">Apagar</button>
-    </div>
-    <button class="as-cancel" onclick="cancelDel()">Cancelar</button>
+  <div class="as-title">
+    <h3 id="as-title">Apagar aposta?</h3>
+    <p id="as-msg">Esta ação não pode ser desfeita.</p>
+  </div>
+  <button class="as-btn red" id="as-confirm-btn" onclick="confirmActionSheet()">Apagar</button>
+</div>
+<button class="as-cancel" onclick="cancelActionSheet()">Cancelar</button>
   </div>
 </div>
 
@@ -1061,7 +1073,7 @@ const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 let currentUser = null;
 let _accessToken = null;
 let _refreshToken = null;
-let bets = [], selResult = '', pendingId = null;
+let bets = [], selResult = '', pendingId = null, _pendingEditId = null;
 
 async function refreshSession() {
   const rt = _refreshToken || localStorage.getItem('supa_refresh');
@@ -2535,7 +2547,7 @@ function renderHistory(){
     const d=new Date(b.data).toLocaleDateString('pt-PT',{day:'2-digit',month:'short'});
     const c=bc(b.resultado);
     const sid=esc(String(b.id));
-    return `<div class="bi">
+    return `<div class="bi" id="bet-${sid}">
       <div class="bdot ${c}"></div>
       <div class="bbody">
         <div class="btop"><span class="bcasa">${esc(b.casa)}</span><span class="bbadge ${c}">${esc(b.resultado)}</span></div>
@@ -2588,6 +2600,9 @@ let editingId=null, editResult='';
 function openEdit(id){
   const b=bets.find(x=>String(x.id)===String(id));
   if(!b) return;
+  // Guardar posição de scroll e ID antes de navegar para o editor
+  _historyScrollTop = document.querySelector('.content')?.scrollTop || 0;
+  _pendingEditId = String(id);
   editingId=id;
   editResult=b.resultado;
   document.getElementById('e-data').value=b.data;
@@ -2699,21 +2714,93 @@ function updateBet(){
   }, 1000);
 }
 
-function askDel(id){pendingId=String(id);document.getElementById('ov').classList.add('show');}
-function cancelDel(){document.getElementById('ov').classList.remove('show');pendingId=null;}
-function confirmDel(){
-  const delId=pendingId;
-  if(typeof Sentry !== 'undefined' && typeof Sentry.addBreadcrumb === 'function') Sentry.addBreadcrumb({
-    category: 'bet', message: 'confirmDel: aposta eliminada', level: 'info',
-    data: { id: delId }
-  });
-  bets=bets.filter(b=>String(b.id)!==String(delId));
-  deleteFromDB(delId);
-  ImageUploader.remove(delId).catch(() => {}); // limpa imagem do Storage se existir
-  buildYears(); updateHdr();renderHistory();renderAnalytics();
-  cancelDel();
+/**
+ * Modo atual do action sheet: 'delete' | 'cancel-edit'
+ * Controla o comportamento de confirmActionSheet().
+ */
+let _asMode = 'delete';
+let _historyScrollTop = 0; // guarda posição de scroll antes de abrir o editor
+
+/**
+ * Abre o action sheet genérico configurando título, mensagem e modo.
+ */
+function openActionSheet(title, msg, confirmLabel, mode) {
+  document.getElementById('as-title').textContent = title;
+  document.getElementById('as-msg').textContent = msg;
+  document.getElementById('as-confirm-btn').textContent = confirmLabel;
+  _asMode = mode;
+  document.getElementById('ov').classList.add('show');
 }
-document.getElementById('ov').addEventListener('click',e=>{if(e.target.id==='ov')cancelDel();});
+
+/**
+ * Cancela e fecha o action sheet sem executar nenhuma ação.
+ */
+function cancelActionSheet() {
+  document.getElementById('ov').classList.remove('show');
+  pendingId = null;
+}
+
+/**
+ * Executa a ação confirmada consoante o modo ativo do action sheet.
+ */
+function confirmActionSheet() {
+  if (_asMode === 'delete') {
+    _doDelete();
+  } else if (_asMode === 'cancel-edit') {
+    _doCancelEdit();
+  }
+  cancelActionSheet();
+}
+
+/** Lógica de eliminação de aposta (extraída de confirmDel). */
+function _doDelete() {
+  const delId = pendingId;
+  if (typeof Sentry !== 'undefined' && typeof Sentry.addBreadcrumb === 'function') {
+    Sentry.addBreadcrumb({
+      category: 'bet', message: 'confirmDel: aposta eliminada', level: 'info',
+      data: { id: delId }
+    });
+  }
+  bets = bets.filter(b => String(b.id) !== String(delId));
+  deleteFromDB(delId);
+  ImageUploader.remove(delId).catch(() => {});
+  buildYears(); updateHdr(); renderHistory(); renderAnalytics();
+}
+
+/** Abre o action sheet no modo "apagar aposta". */
+function askDel(id) {
+  pendingId = String(id);
+  openActionSheet('Apagar aposta?', 'Esta ação não pode ser desfeita.', 'Apagar', 'delete');
+}
+
+/** Abre o action sheet no modo "cancelar edição". */
+function askCancelEdit() {
+  openActionSheet('Cancelar edição?', 'As alterações não guardadas serão perdidas.', 'Cancelar edição', 'cancel-edit');
+}
+
+/** Volta ao histórico e restaura a posição de scroll na aposta editada. */
+function _doCancelEdit() {
+  editingId = null;
+  editResult = '';
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-history').classList.add('active');
+  document.querySelector('.tab-btn[onclick*="history"]').classList.add('active');
+  // Restaurar scroll: tenta scrollIntoView na aposta; fallback para scrollTop guardado
+  setTimeout(() => {
+    const el = document.getElementById('bet-' + _pendingEditId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      const content = document.querySelector('.content');
+      if (content) content.scrollTop = _historyScrollTop;
+    }
+  }, 50);
+}
+
+document.getElementById('ov').addEventListener('click', e => {
+  if (e.target.id === 'ov') cancelActionSheet();
+});
 
 function renderAnalytics(){
   const an=document.getElementById('a-ano')?.value||'';
