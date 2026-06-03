@@ -1790,7 +1790,14 @@ async function loadPlataformas() {
     `/rest/v1/plataformas?order=nome.asc`,
     _accessToken
   ));
-  plataformas = Array.isArray(result.data) ? result.data : [];
+  const raw = Array.isArray(result.data) ? result.data : [];
+  // Deduplicar: se existir versão global e custom com o mesmo nome, manter só a global
+  const seen = new Map();
+  raw.forEach(p => {
+    const key = p.nome.toLowerCase();
+    if (!seen.has(key) || p.is_global) seen.set(key, p);
+  });
+  plataformas = [...seen.values()].sort((a, b) => a.nome.localeCompare(b.nome));
   buildPlataformaSelects();
 }
 
