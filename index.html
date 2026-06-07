@@ -1318,6 +1318,7 @@ async function logout() {
   // Reset de estado de sessão para evitar comportamento incorreto após re-login
   pendingId = null; _pendingEditId = null; _asMode = 'delete';
   editingId = null; editResult = '';
+  selResult = '';
   localStorage.removeItem('supa_token');
   localStorage.removeItem('supa_refresh');
   localStorage.removeItem('supa_user');
@@ -2068,8 +2069,20 @@ async function init(){
     category: 'app', message: 'init: aplicação iniciada', level: 'info'
   });
   // Show loading state
-  document.getElementById('f-data').value=new Date().toISOString().slice(0,10);
+  // Reset completo do formulário Nova Aposta ao iniciar sessão
+  document.getElementById('f-data').value = new Date().toISOString().slice(0,10);
   updateDateDisplay('f-data');
+  ['f-gastos','f-reembolso','f-lucro','f-notas'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('f-lucro').className = 'if num';
+  document.getElementById('f-lucro').style.display = '';
+  const flc = document.getElementById('f-lucro-curso');
+  if (flc) flc.style.display = 'none';
+  document.querySelectorAll('#page-add .seg').forEach(b => {
+    b.className = 'seg';
+    b.setAttribute('aria-pressed', 'false');
+  });
   buildPlataformaSelects();
   
   // Migrate historical data if first login
