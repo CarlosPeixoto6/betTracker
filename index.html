@@ -677,7 +677,7 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
   // (Mobile Safari envia-o via onerror sem exception.values populado)
   const exMsg = event?.exception?.values?.[0]?.value || '';
   const evMsg = event?.message || '';
-  const isScriptError = (s) => s === 'Script error.' || s === 'Script error';
+  const isScriptError = (s) => s.includes('Script error');
   if(isScriptError(exMsg) || isScriptError(evMsg)) return null;
   return event;
 }
