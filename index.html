@@ -1989,7 +1989,7 @@ function eur(v){return new Intl.NumberFormat('pt-PT',{style:'currency',currency:
 function eurS(v){return(v>=0?'+':'')+eur(v);}
 function bc(r){return{Win:'won',Lost:'lost','Em curso':'curso',Ganhou:'won',Perdeu:'lost'}[r]||'lost';}
 
-// ── XSS protection - escape all user data before HTML insertion ──
+/** Escapa caracteres especiais HTML para prevenir XSS. */
 function esc(str) {
   if(str === null || str === undefined) return '';
   return String(str)
@@ -1997,16 +1997,7 @@ function esc(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-function esc(str){ // XSS-safe HTML escape
-  if(!str) return '';
-  return String(str)
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;')
-    .replace(/'/g,'&#039;');
+    .replace(/'/g, '&#039;');
 }
 
 window.addEventListener('DOMContentLoaded',()=>{
