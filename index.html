@@ -747,12 +747,12 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
         <div class="ir">
           <!-- [A] span → label com for="f-gastos" -->
           <label class="il" for="f-gastos">Gastos (€)</label>
-          <input type="number" class="if num" id="f-gastos" step="0.01" min="0" placeholder="0,00" oninput="autoCalc()">
+          <input type="number" inputmode="decimal" class="if num" id="f-gastos" step="0.01" min="0" placeholder="0,00" oninput="autoCalc()">
         </div>
         <div class="ir">
           <!-- [A] span → label com for="f-reembolso" -->
           <label class="il" for="f-reembolso">Reembolso (€)</label>
-          <input type="number" class="if num" id="f-reembolso" step="0.01" min="0" placeholder="0,00" oninput="autoCalc()">
+          <input type="number" inputmode="decimal" class="if num" id="f-reembolso" step="0.01" min="0" placeholder="0,00" oninput="autoCalc()">
         </div>
         <div class="ir">
           <!-- [A] span → label com for="f-lucro" -->
@@ -836,12 +836,12 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
         <div class="ir">
           <!-- [A] span → label com for="e-gastos" -->
           <label class="il" for="e-gastos">Gastos (€)</label>
-          <input type="number" class="if num" id="e-gastos" step="0.01" min="0" placeholder="0,00" oninput="autoCalcEdit()">
+          <input type="number" inputmode="decimal" class="if num" id="e-gastos" step="0.01" min="0" placeholder="0,00" oninput="autoCalcEdit()">
         </div>
         <div class="ir">
           <!-- [A] span → label com for="e-reembolso" -->
           <label class="il" for="e-reembolso">Reembolso (€)</label>
-          <input type="number" class="if num" id="e-reembolso" step="0.01" min="0" placeholder="0,00" oninput="autoCalcEdit()">
+          <input type="number" inputmode="decimal" class="if num" id="e-reembolso" step="0.01" min="0" placeholder="0,00" oninput="autoCalcEdit()">
         </div>
         <div class="ir">
           <!-- [A] span → label com for="e-lucro" -->
