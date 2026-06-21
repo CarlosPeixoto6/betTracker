@@ -30,7 +30,7 @@
 }
 * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
 html,body { height:100%; background:var(--bg); color:var(--label); font-family:var(--font);
-  overflow:hidden; -webkit-font-smoothing:antialiased; }
+  overflow:hidden; -webkit-font-smoothing:antialiased; touch-action:manipulation; }
 #app { display:flex; flex-direction:column; height:100dvh; }
 
 /* Navbar */
@@ -304,6 +304,10 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
   width: 100%;
 }
 
+/* iOS: previne zoom automático ao focar inputs/selects (font-size < 16px) */
+@media (max-width: 599px) {
+  input, select, textarea { font-size: 16px !important; }
+}
 @media (min-width: 600px) {
   /* Tab bar becomes a sidebar on desktop */
   #app { flex-direction:row; }
