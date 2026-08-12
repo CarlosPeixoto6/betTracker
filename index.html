@@ -24,6 +24,7 @@
   --red:       #FF3B30;
   --orange:    #FF9500;
   --indigo:    #5856D6;
+  --bg-alt:    #E5E5EA;
   --safe-top:  env(safe-area-inset-top, 44px);
   --safe-bot:  env(safe-area-inset-bottom, 34px);
   --font:      -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
@@ -192,6 +193,8 @@ select.if option[value="__nova__"] { color:var(--label3) !important; }
   transition:background .1s;
 }
 .bi:active { background:var(--fill); }
+.bi.week-b { background:var(--bg-alt); }
+.bi.week-b:active { background:var(--fill); }
 .bdot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
 .bdot.won  { background:var(--green); }
 .bdot.lost { background:var(--red); }
@@ -1993,6 +1996,24 @@ function eur(v){return new Intl.NumberFormat('pt-PT',{style:'currency',currency:
 function eurS(v){return(v>=0?'+':'')+eur(v);}
 function bc(r){return{Win:'won',Lost:'lost','Em curso':'curso',Ganhou:'won',Perdeu:'lost'}[r]||'lost';}
 
+/**
+ * Determina a paridade da semana (0 ou 1) para uma data, com semanas a começar
+ * à segunda-feira. Usa 2024-01-01 (segunda-feira) como referência fixa, para que
+ * a alternância seja estável e independente do ano, ordem de exibição ou filtros ativos.
+ * Retorna 1 = fundo alternado (cinzento), 0 = fundo normal (branco).
+ */
+function weekParity(dateStr){
+  const d = new Date(dateStr+'T12:00:00');
+  const day = d.getDay();
+  const diffToMonday = (day===0 ? -6 : 1-day);
+  const monday = new Date(d);
+  monday.setDate(d.getDate()+diffToMonday);
+  monday.setHours(0,0,0,0);
+  const ref = new Date('2024-01-01T00:00:00');
+  const diffWeeks = Math.round((monday-ref)/(7*24*60*60*1000));
+  return ((diffWeeks % 2)+2) % 2;
+}
+
 /** Escapa caracteres especiais HTML para prevenir XSS. */
 function esc(str) {
   if(str === null || str === undefined) return '';
@@ -2560,7 +2581,8 @@ function renderHistory(){
     const d=new Date(b.data).toLocaleDateString('pt-PT',{day:'2-digit',month:'short'});
     const c=bc(b.resultado);
     const sid=esc(String(b.id));
-    return `<div class="bi" id="bet-${sid}">
+    const weekCls=weekParity(b.data)===1?' week-b':'';
+    return `<div class="bi${weekCls}" id="bet-${sid}">
       <div class="bdot ${c}"></div>
       <div class="bbody">
         <div class="btop"><span class="bcasa">${esc(b.casa)}</span><span class="bbadge ${c}">${esc(b.resultado)}</span></div>
